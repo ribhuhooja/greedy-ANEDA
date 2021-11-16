@@ -1,1 +1,1 @@
-# hyperbolic
+# dl-hyperbolic-random-graphs
