@@ -3,8 +3,8 @@
 - Paper: Shortest path distance approximation using deep learning techniques (2018): &nbsp; [Paper](https://arxiv.org/abs/2002.05257) &nbsp;  &nbsp;   [SourceCode](https://github.com/nayash/shortest-distance-approx-deep-learning)
 
   + Ideas of the paper:
-    1. Read data file $\rightarrow$ graph
-    2. Use Node2Vec: nodes $\rightarrow$ embedding
+    1. Read data file -> graph
+    2. Use Node2Vec: nodes -> embedding
     3. Create labels
         + 3.1 Pick a few nodes, make them as landmark nodes (randomly)
         + 3.2 Calculate the distance for every pair $(l, n)$
