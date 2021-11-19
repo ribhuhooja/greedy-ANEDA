@@ -2,16 +2,16 @@
 
 - Paper: Shortest path distance approximation using deep learning techniques (2018): &nbsp; [Paper](https://arxiv.org/abs/2002.05257) &nbsp;  &nbsp;   [SourceCode](https://github.com/nayash/shortest-distance-approx-deep-learning)
 
-  + Ideas of the paper:
-    1. Read data file -> graph
-    2. Use Node2Vec: nodes -> embedding
-    3. Create labels
-        + 3.1 Pick a few nodes, make them as landmark nodes (randomly)
-        + 3.2 Calculate the distance for every pair $(l, n)$
-        ($l$ is a landmark node, $n$ is a node in the graph)
-    4. Creat datasets with the labels from the previous step
-    5. Make a model, try to predict the distance between 2 nodes
-    6. Evaluate results
+    + Ideas of the paper:<br>
+      1\. Read data file -> graph<br>
+      2\. Use Node2Vec: nodes -> embedding<br>
+      3\. Create labels<br>
+       &nbsp;  &nbsp;   \+ 3.1 Pick a few nodes, make them as landmark nodes (randomly)<br>
+       &nbsp;  &nbsp; \+ 3.2 Calculate the distance for every pair (`l`, `n`),
+        (`l` is a landmark node, `n` is a node in the graph)<br>
+       4\. Create datasets with the labels from the previous step<br>
+       5\. Make a model, try to predict the distance between 2 nodes<br>
+       6\. Evaluate results<br>
 
 
 - [Source Code from Sarel](https://github.com/kryptokommunist/path-length-approximation-deep-learning)
