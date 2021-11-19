@@ -15,7 +15,7 @@
 
 
 - [Source Code from Sarel](https://github.com/kryptokommunist/path-length-approximation-deep-learning)
-- [New Source Code](https://github.com/BU-Lisp/dl-hyperbolic-random-graphs/tree/main/path_approximation)
+- [New Source Code (this repo)](https://github.com/BU-Lisp/dl-hyperbolic-random-graphs/tree/main/path_approximation)
   + Quick start:
   
     ```
