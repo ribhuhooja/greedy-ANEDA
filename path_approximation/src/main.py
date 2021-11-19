@@ -8,9 +8,9 @@ if __name__ == '__main__':
     # TODO: should keep the config in one separate file
 
     ##### Step 1. Read data
-    ## Input file: should be a edgelist file, no extension needed
+    ## Input file: should be an edgelist file, no extension needed
     # took ~6mins/epoch to get Node2Vec for "socfb-American75", using 8GB RAM Mac
-    # "small_test" is a small dataset for testing, default data shoudl be "socfb-American75"
+    # "small_test" is a small dataset for testing, default data should be "socfb-American75"
     file_name = "small_test"  # "socfb-American75"
 
     ## Load input file into a DGL graph
@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     ## Option 1: Get a few landmark nodes randomly from the graph:
     random_seed = 2021
-    num_landmarks = 20
+    num_landmarks = 20  #150
 
     ## Option 2: set `num_landmarks` to `graph.num_nodes()` to make all the nodes as landmark nodes
     # num_landmarks = nx_graph.number_of_nodes()
