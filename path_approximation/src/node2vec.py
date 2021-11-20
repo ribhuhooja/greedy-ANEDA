@@ -1,12 +1,12 @@
-import os
 from collections import namedtuple
 
-import dill
 import torch
 import torch.nn as nn
 from dgl.sampling import node2vec_random_walk
 from sklearn.linear_model import LogisticRegression
 from torch.utils.data import DataLoader
+
+from utilities import write_file
 
 
 # https://github.com/dmlc/dgl/tree/e667545da55017d5dbbd3f243d986506284d3e41/examples/pytorch/node2vec
@@ -324,13 +324,7 @@ def run_node2vec(graph, eval_set=None, args=None, output_path=None):
     trainer.train(epochs=args.epochs, batch_size=args.batch_size, learning_rate=args.learning_rate)
 
     # Calc embedding
-    embedding = trainer.embedding()
+    embedding = trainer.embedding().data
 
-    if output_path is not None:
-        folder_path = os.path.dirname(output_path)  # create an output folder, e.g., "../output/embedding"
-        if not os.path.exists(folder_path):  # mkdir the folder to store output files
-            os.makedirs(folder_path)
-        # Write to file
-        with open(output_path, 'wb') as f:
-            dill.dump(embedding, f)
+    write_file(output_path, embedding)
     return embedding

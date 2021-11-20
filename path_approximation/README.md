@@ -1,4 +1,5 @@
 # Path Approximation
+**Approximate distance between any pair of nodes in the graph**
 
 - Paper: Shortest path distance approximation using deep learning techniques (2018): &nbsp; [Paper](https://arxiv.org/abs/2002.05257) &nbsp;  &nbsp;   [SourceCode](https://github.com/nayash/shortest-distance-approx-deep-learning)
 
@@ -20,7 +21,7 @@
   
     ```
     pip install -r requirements.txt
-    python main.py
+    python src/main.py
     ```
   + Current ideas:
     Similar to the 2018 paper, modify step 3 and 4:
