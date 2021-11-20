@@ -6,7 +6,7 @@ from dgl.sampling import node2vec_random_walk
 from sklearn.linear_model import LogisticRegression
 from torch.utils.data import DataLoader
 
-from utilities import write_file
+from data_helper import write_file
 
 
 # https://github.com/dmlc/dgl/tree/e667545da55017d5dbbd3f243d986506284d3e41/examples/pytorch/node2vec
@@ -309,7 +309,7 @@ def run_node2vec(graph, eval_set=None, args=None, output_path=None):
     args = Node2VecParams(**args)
 
     # train Node2Vec
-    print("training...")
+    print("training Node2Vec...")
     trainer = Node2vecModel(graph,
                             embedding_dim=args.embedding_dim,
                             walk_length=args.walk_length,

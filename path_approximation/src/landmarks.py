@@ -1,59 +1,11 @@
-import os
 from typing import List, Dict, Tuple
 
-import dgl
-import dill
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-import scipy
-from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
-
-def write_file(output_path, obj):
-    ## Write to file
-    if output_path is not None:
-        folder_path = os.path.dirname(output_path)  # create an output folder
-        if not os.path.exists(folder_path):  # mkdir the folder to store output files
-            os.makedirs(folder_path)
-        with open(output_path, 'wb') as f:
-            dill.dump(obj, f)
-    return True
-
-
-def load_edgelist_file_to_dgl_graph(path: str, undirected: bool, edge_weights=None):
-    """
-    Reads a edgeList file in which each row contains an edge of the network, then returns a DGL graph.
-    :param path: path to the edgeList file
-    edgeList file  should contain 2 columns as follows:
-        0 276
-        0 58
-        0 132
-
-    :param path:
-    :param undirected:
-    :param edge_weights:
-
-    :return: a DGL graph
-    """
-    input_np = np.loadtxt(path, dtype=np.int)
-
-    # if the edgeList file starts from some number rather than 0, we will subtract that number from the indices
-    min_index = np.min(input_np)
-    input_np = input_np - min_index  ## make all indices start from 0
-    row_indices, col_indices = input_np[:, 0], input_np[:, 1]
-
-    if edge_weights is None:
-        edge_weights = np.ones(input_np.shape[0])  # setting all the weights to 1(s)
-    dim = np.max(input_np) + 1
-
-    input_mx = scipy.sparse.coo_matrix((edge_weights, (row_indices, col_indices)), shape=(dim, dim))
-    g = dgl.from_scipy(input_mx)
-
-    if undirected:  # convert directed graph (as default, all the edges are directed in DGL) to undirected graph
-        g = dgl.to_bidirected(g)
-    return g
+from data_helper import write_file
 
 
 def get_landmark_nodes(num_landmarks: int, graph: nx.Graph, random_seed: int = None) -> List:
@@ -104,12 +56,6 @@ def calculate_landmarks_distance(landmark_nodes: List, graph: nx.Graph, output_p
     return distance_map
 
 
-def read_pkl_file(path):
-    with open(path, 'rb') as f:
-        generator = dill.load(f)
-    return generator
-
-
 def plot_nx_graph(nx_g: nx.Graph, fig_size: Tuple = (15, 7), options: Dict = None, file_name=None):
     if options is None:
         options = {
@@ -131,7 +77,7 @@ def create_dataset(distance_map: Dict, embedding, binary_operator="average"):
     :param distance_map: dictionary (key, value)=(landmark_node, list_distance_to_each_node_n)
     :param embedding: embedding vectors of the nodes
     :param binary_operator: ["average", "concatenation", "subtraction", "hadamard"]
-    :return: return 2 arrays:  array of data and  array of labels.
+    :return: return 2 arrays:  array of data and array of labels.
     """
     if binary_operator not in ["average", "concatenation", "subtraction", "hadamard"]:
         raise ValueError(f"binary_operator is not valid!: {binary_operator}")
@@ -139,9 +85,9 @@ def create_dataset(distance_map: Dict, embedding, binary_operator="average"):
     data_list = []
     label_list = []
     node_pairs = set()
-    for landmark in distance_map.keys():
+    for landmark in tqdm(distance_map.keys()):
         distance_list = distance_map[landmark]
-        for node, distance in enumerate(tqdm(distance_list)):
+        for node, distance in enumerate(distance_list):
             pair_key = tuple(sorted([node, landmark]))
             if node == landmark or distance == np.inf or pair_key in node_pairs:
                 pass
@@ -157,24 +103,3 @@ def create_dataset(distance_map: Dict, embedding, binary_operator="average"):
                 label_list.append(label)
 
     return np.array(data_list, dtype=object), np.array(label_list, dtype=np.int16)
-
-
-def get_train_valid_test_split(x, y, test_size=0.2, val_size=0.2, output_path=None, file_name=None, shuffle=True, random_seed=None):
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=test_size, random_state=random_seed,
-                                                        shuffle=shuffle, stratify=y)
-    val_size_to_train_size = val_size / (1 - test_size)
-    x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size=val_size_to_train_size,
-                                                      random_state=random_seed, shuffle=shuffle, stratify=y_train)
-
-    print(
-        f'shapes of train: {x_train.shape, y_train.shape}, valid: {x_val.shape, y_val.shape}, test: {x_test.shape, y_test.shape}')
-    datasets = dict()
-    datasets["x_train"] = x_train
-    datasets["y_train"] = y_train
-    datasets["x_val"] = x_val
-    datasets["y_val"] = y_val
-    datasets["x_test"] = x_test
-    datasets["y_test"] = y_test
-    write_file(os.path.join(output_path, f"{file_name}_train_val_test.pkl"), datasets)
-
-    return datasets

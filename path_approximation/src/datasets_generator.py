@@ -1,19 +1,30 @@
+import os.path
+
 import dgl
+
+import data_helper
+import landmarks
 import node2vec
-import utilities
+from data_helper import read_file
 
-def main():
+
+def create_train_val_test_sets(file_name, force_override=False):
+    final_output_path = f"../output/datasets/{file_name}_train_val_test.pkl"
+
+    if not force_override and os.path.isfile(final_output_path):  ## if the file already exists
+        print(f"File '{file_name}' already exists, only read it back!")
+        return read_file(final_output_path)
+
     # TODO: should keep the config in one separate file
-
     ##### Step 1. Read data
-    ## Input file: should be an edgelist file, no extension needed
+    ## `file_name` is an edgelist file, no extension needed
     # "small_test" is a small dataset for testing, default data should be "socfb-American75"
-    file_name = "small_test"  # "socfb-American75"
+    file_name = "ego-facebook-original"  # "socfb-American75"  # "socfb-American75"
 
     ## Load input file into a DGL graph
     input_path = f"../data/{file_name}.edgelist"
-    graph = utilities.load_edgelist_file_to_dgl_graph(path=input_path, undirected=True,
-                                                      edge_weights=None)
+    graph = data_helper.load_edgelist_file_to_dgl_graph(path=input_path, undirected=True,
+                                                        edge_weights=None)
 
     #####  Step 2. Run Node2Vec to get the embedding
     # Node2Vec params
@@ -40,37 +51,34 @@ def main():
 
     ## Option 1: Get a few landmark nodes randomly from the graph:
     random_seed = 2021
-    num_landmarks = 20  # 150
+    num_landmarks = 150
 
     ## Option 2: set `num_landmarks` to `graph.num_nodes()` to make all the nodes as landmark nodes.
-    ## TODO: when all nodes are landmark nodes, need a better way to calc the distance (symmetric matrix)
+    ## TODO: when all nodes are landmark nodes, might need a better way to calc the distance (symmetric matrix)
     # num_landmarks = nx_graph.number_of_nodes()
 
     ## Get landmark nodes:
-    landmark_nodes = utilities.get_landmark_nodes(num_landmarks, nx_graph, random_seed=random_seed)
+    landmark_nodes = landmarks.get_landmark_nodes(num_landmarks, nx_graph, random_seed=random_seed)
 
     # Get landmarks' distance: get distance of every pair (l,n), where l is a landmark node, n is a node in the graph
     landmark_distance_output = f"../output/landmarks_distance/{file_name}_dist.pkl"  # where to store the output file
     print("Calculating landmarks distance...")
-    distance_map = utilities.calculate_landmarks_distance(landmark_nodes, nx_graph,
+    distance_map = landmarks.calculate_landmarks_distance(landmark_nodes, nx_graph,
                                                           output_path=landmark_distance_output)
     print("Done landmarks distance!")
 
     ## Plot the network
-    utilities.plot_nx_graph(nx_graph, file_name=file_name)
+    # utilities.plot_nx_graph(nx_graph, file_name=file_name)
 
     ##### Step 4: Create datasets to train a model
     print("creating datasets...")
-    x, y = utilities.create_dataset(distance_map, embedding)
-    output_path = "../output/datasets"
-    utilities.get_train_valid_test_split(x, y, output_path=output_path, file_name=file_name)
+    x, y = data_helper.create_dataset(distance_map, embedding)
+    x, y = data_helper.remove_data_with_a_few_observations(x, y)
+    test_size = 0.25
+    val_size = 0.15
+    train_val_test_path = "../output/datasets"
+    datasets = data_helper.train_valid_test_split(x, y, test_size=test_size, val_size=val_size,
+                                                  output_path=train_val_test_path,
+                                                  file_name=file_name)
     print("Done writing file!")
-
-    ##### Step 5: Create model
-    # Refer to https://github.com/kryptokommunist/path-length-approximation-deep-learning/blob/master/src/trainer.py
-
-    ##### Step 6: Evaluate the results
-
-if __name__ == '__main__':
-    main()
-
+    return datasets

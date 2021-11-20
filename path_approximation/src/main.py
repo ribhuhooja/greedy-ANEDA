@@ -1,4 +1,4 @@
-import generate_datasets
+from testing_functions import run_some_linear_models
 
 if __name__ == '__main__':
-    generate_datasets.main()
+    run_some_linear_models(file_name="socfb-American75")
