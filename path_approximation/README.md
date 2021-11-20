@@ -29,3 +29,10 @@
     3'. Use all the nodes as landmark nodes<br>
     4'. Use all data as the training set (try to overfit the model)
 
+
+#### TODO
+- [x] Create datasets 
+- [x] Linear model
+- [ ] [Neural Net](https://github.com/BU-Lisp/dl-hyperbolic-random-graphs/blob/main/path_approximation/src/models.py)
+- [ ] Evaluation
+
