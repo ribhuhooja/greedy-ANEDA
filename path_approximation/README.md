@@ -26,7 +26,9 @@
   + Current ideas:
     Similar to the 2018 paper, modify step 3 and 4:
 
-    3'. Use all the nodes as landmark nodes<br>
+    3'. <br>
+          &nbsp;   + 3'.1. Use all the nodes as landmark nodes<br>
+          &nbsp;   + 3'.2. Still pick some nodes as landmarks, but instead of choosing randomly, we [choose high-degree nodes](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/msr-tr-2009-84.pdf) <br>
     4'. Use all data as the training set (try to overfit the model)
 
 
