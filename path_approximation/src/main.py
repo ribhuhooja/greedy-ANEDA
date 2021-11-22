@@ -8,5 +8,5 @@ if __name__ == '__main__':
     # run_linear_model_with_under_and_over_sampling(file_name="socfb-American75", force_recreate_datasets=False, write_train_val_test=False)
     ## result: linear_regression: Accuracy=52.527%, MSE=0.492, MAE=0.558, MRE=0.223
 
-    run_some_linear_models(file_name="socfb-American75", force_recreate_datasets=False, write_train_val_test=False)
+    run_some_linear_models(file_name="socfb-American75", force_recreate_datasets=True, write_train_val_test=False)
     ## result: linear_regression: Accuracy = 69.712 %, MSE = 0.248, MAE = 0.393, MRE = 0.16

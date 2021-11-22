@@ -29,7 +29,7 @@ def create_train_val_test_sets(file_name, force_recreate_datasets, write_train_v
     #####  Step 2. Run Node2Vec to get the embedding
     # Node2Vec params
     node2vec_args = {
-        "device": "cpu",
+        "device": "cuda",
         "embedding_dim": 128,
         "walk_length": 80,  # 80
         "window_size": 10,  # 10

@@ -8,13 +8,13 @@ import models
 from datasets_generator import create_train_val_test_sets
 
 
-def run_some_linear_models(file_name, force_recreate_datasets, write_train_val_test):
+def run_some_linear_models(file_name, force_recreate_datasets, write_train_val_test, logs_path="logs"):
     """
     Testing purpose.
     :param file_name:
     :return:
     """
-    logging.basicConfig(filename='../output/logs/running_log.log', level=logging.INFO)
+    logging.basicConfig(filename=f'../output/{logs_path}/running_log.log', level=logging.INFO)
 
     datasets = create_train_val_test_sets(file_name, force_recreate_datasets=force_recreate_datasets,
                                           write_train_val_test=write_train_val_test)
@@ -41,7 +41,7 @@ def run_some_linear_models(file_name, force_recreate_datasets, write_train_val_t
 
 
 def run_linear_model_with_under_and_over_sampling(file_name, force_recreate_datasets, write_train_val_test,
-                                                  seed_random=9999):
+                                                  logs_path="logs", seed_random=9999):
     """
     Try to do under and over-sampling on training set before feeding through a linear regresison model
     :param file_name:
@@ -50,7 +50,7 @@ def run_linear_model_with_under_and_over_sampling(file_name, force_recreate_data
     :param seed_random:
     :return:
     """
-    logging.basicConfig(filename='running_log.log', level=logging.INFO)
+    logging.basicConfig(filename=f'../output/{logs_path}/running_log.log', level=logging.INFO)
 
     datasets = create_train_val_test_sets(file_name, force_recreate_datasets=force_recreate_datasets,
                                           write_train_val_test=write_train_val_test)

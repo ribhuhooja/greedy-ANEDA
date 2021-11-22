@@ -208,7 +208,7 @@ class Node2vecModel(object):
         Interval steps of evaluation.
         if set <= 0, model will not be evaluated. Default: ``None``.
     device: str
-        device, default 'cpu'.
+        device, {'cpu', 'cuda'}, default 'cpu'
     """
 
     def __init__(self, g, embedding_dim, walk_length, p=1.0, q=1.0, num_walks=1, window_size=5,
@@ -225,6 +225,8 @@ class Node2vecModel(object):
             self.device = device
         else:
             self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+        print(f"...using {self.device}")
 
     def _train_step(self, model, loader, optimizer, device):
         model.train()
@@ -264,7 +266,7 @@ class Node2vecModel(object):
             optimizer = torch.optim.SparseAdam(list(self.model.parameters()), lr=learning_rate)
         else:
             optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
-        for i in enumerate(range(epochs)):
+        for i in range(epochs):
             loss = self._train_step(self.model, loader, optimizer, self.device)
             if self.eval_steps > 0:
                 if epochs % self.eval_steps == 0:
@@ -295,7 +297,7 @@ def run_node2vec(graph, eval_set=None, args=None, output_path=None):
     if args is None:
         # run with default params
         args = {
-            "device": "cpu",
+            "device": "cuda",
             "embedding_dim": 128,
             "walk_length": 50,
             "window_size": 5,
@@ -332,6 +334,9 @@ def run_node2vec(graph, eval_set=None, args=None, output_path=None):
     print(f"done training node2vec, running time = {np.round((t_tock - t_tick) / 60)}")
     # Calc embedding
     embedding = trainer.embedding().data
+
+    if args.device == "cuda":
+        embedding = embedding.cpu().numpy()
 
     write_file(output_path, embedding)
     return embedding

@@ -4,7 +4,8 @@ from typing import Tuple, Dict
 import matplotlib.pyplot as plt
 import networkx as nx
 
-def make_log_folder(log_folder_name =  "logs"):
+
+def make_log_folder(log_folder_name="logs"):
     if not os.path.exists("../output"):
         os.makedirs("../output")
 
