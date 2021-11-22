@@ -7,6 +7,7 @@ from metrics import mean_absolute_percentage_error
 
 
 def run_linear_regression(datasets, use_standard_scaler=False, merge_train_val=True):
+    print("training linear regression model...")
     x_train, y_train = datasets["x_train"], datasets["y_train"]
     x_test, y_test = datasets["x_test"], datasets["y_test"]
 
@@ -23,8 +24,8 @@ def run_linear_regression(datasets, use_standard_scaler=False, merge_train_val=T
     else:
         normalize = True
 
-    print("X.train: ", x_train.shape)
-    print("X.train[0]: ", x_train[0])
+    # print("X.train: ", x_train.shape)
+    # print("X.train[0]: ", x_train[0])
     linear_regression_model = LinearRegression(fit_intercept=True, normalize=normalize, n_jobs=-1).fit(x_train, y_train)
     y_pred = linear_regression_model.predict(x_test)
     y_class = np.round(y_pred)

@@ -1,6 +1,5 @@
-from typing import List, Dict, Tuple
+from typing import List
 
-import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 from tqdm import tqdm
@@ -54,52 +53,3 @@ def calculate_landmarks_distance(landmark_nodes: List, graph: nx.Graph, output_p
 
     write_file(output_path, distance_map)
     return distance_map
-
-
-def plot_nx_graph(nx_g: nx.Graph, fig_size: Tuple = (15, 7), options: Dict = None, file_name=None):
-    if options is None:
-        options = {
-            'node_size': 500,
-            'width': 1,
-            'node_color': 'gray',
-        }
-
-    plt.figure(figsize=fig_size)
-    nx.draw(nx_g, **options, with_labels=True)
-    plt.savefig(f'../plots/{file_name}_pic.png')
-    plt.show()
-    return None
-
-
-def create_dataset(distance_map: Dict, embedding, binary_operator="average"):
-    """
-    create dataset in which each data point (x,y) is (the embedding of 2 nodes, its distance)
-    :param distance_map: dictionary (key, value)=(landmark_node, list_distance_to_each_node_n)
-    :param embedding: embedding vectors of the nodes
-    :param binary_operator: ["average", "concatenation", "subtraction", "hadamard"]
-    :return: return 2 arrays:  array of data and array of labels.
-    """
-    if binary_operator not in ["average", "concatenation", "subtraction", "hadamard"]:
-        raise ValueError(f"binary_operator is not valid!: {binary_operator}")
-
-    data_list = []
-    label_list = []
-    node_pairs = set()
-    for landmark in tqdm(distance_map.keys()):
-        distance_list = distance_map[landmark]
-        for node, distance in enumerate(distance_list):
-            pair_key = tuple(sorted([node, landmark]))
-            if node == landmark or distance == np.inf or pair_key in node_pairs:
-                pass
-            else:
-                node_pairs.add(pair_key)
-                if binary_operator == "average":
-                    data = (embedding[node] + embedding[landmark]) / 2.0
-                else:
-                    # TODO: Need to implement other binary operators
-                    raise ValueError(f"binary_operator is not implemented yet!: {binary_operator}")
-                label = distance
-                data_list.append(np.array(data))
-                label_list.append(label)
-
-    return np.array(data_list, dtype=object), np.array(label_list, dtype=np.int16)

@@ -8,18 +8,18 @@ import node2vec
 from data_helper import read_file
 
 
-def create_train_val_test_sets(file_name, force_override=False):
+def create_train_val_test_sets(file_name, force_recreate_datasets, write_train_val_test):
     final_output_path = f"../output/datasets/{file_name}_train_val_test.pkl"
 
-    if not force_override and os.path.isfile(final_output_path):  ## if the file already exists
-        print(f"File '{file_name}' already exists, only read it back!")
+    if not force_recreate_datasets and os.path.isfile(final_output_path):  ## if the file already exists
+        print(f"datasets for '{file_name}' already exists, only read them back!")
         return read_file(final_output_path)
 
     # TODO: should keep the config in one separate file
     ##### Step 1. Read data
     ## `file_name` is an edgelist file, no extension needed
     # "small_test" is a small dataset for testing, default data should be "socfb-American75"
-    file_name = "ego-facebook-original"  # "socfb-American75"  # "socfb-American75"
+    # file_name: {"ego-facebook-original", "small_test", "socfb-American75", ...}
 
     ## Load input file into a DGL graph
     input_path = f"../data/{file_name}.edgelist"
@@ -28,22 +28,22 @@ def create_train_val_test_sets(file_name, force_override=False):
 
     #####  Step 2. Run Node2Vec to get the embedding
     # Node2Vec params
-    args = {
+    node2vec_args = {
         "device": "cpu",
         "embedding_dim": 128,
-        "walk_length": 50,  # 80
-        "window_size": 5,  # 10
+        "walk_length": 80,  # 80
+        "window_size": 10,  # 10
         "p": 1.0,  # 0.25,
         "q": 1.0,  # 4.0,
         "num_walks": 10,
-        "epochs": 5,  # 100
+        "epochs": 1,  # 100
         "batch_size": 128,
         "learning_rate": 0.01,
     }
-    # took ~6mins/epoch to get Node2Vec for "socfb-American75", using 8GB RAM, 4CPU Mac
     embedding_output_path = f"../output/embedding/{file_name}_embed.pkl"
-    embedding = node2vec.run_node2vec(graph, eval_set=None, args=args, output_path=embedding_output_path)
-    print("Done embedding!")
+    # took ~6mins/epoch to get Node2Vec for "socfb-American75", using 8GB RAM, 4CPU Macbook
+    embedding = node2vec.run_node2vec(graph, eval_set=None, args=node2vec_args, output_path=embedding_output_path)
+    print(f"Done embedding {file_name}!")
 
     #####  Step 3: Create labels:
     # We convert the `dgl` graph to `networkx` graph. We will use networkx for finding the shortest path
@@ -79,6 +79,5 @@ def create_train_val_test_sets(file_name, force_override=False):
     train_val_test_path = "../output/datasets"
     datasets = data_helper.train_valid_test_split(x, y, test_size=test_size, val_size=val_size,
                                                   output_path=train_val_test_path,
-                                                  file_name=file_name)
-    print("Done writing file!")
+                                                  file_name=file_name, write_train_val_test=write_train_val_test)
     return datasets

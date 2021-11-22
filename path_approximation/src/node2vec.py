@@ -1,5 +1,7 @@
+import time
 from collections import namedtuple
 
+import numpy as np
 import torch
 import torch.nn as nn
 from dgl.sampling import node2vec_random_walk
@@ -262,7 +264,7 @@ class Node2vecModel(object):
             optimizer = torch.optim.SparseAdam(list(self.model.parameters()), lr=learning_rate)
         else:
             optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
-        for i in range(epochs):
+        for i in enumerate(range(epochs)):
             loss = self._train_step(self.model, loader, optimizer, self.device)
             if self.eval_steps > 0:
                 if epochs % self.eval_steps == 0:
@@ -289,6 +291,7 @@ class Node2vecModel(object):
 
 
 def run_node2vec(graph, eval_set=None, args=None, output_path=None):
+    t_tick = time.time()  ## start measuring running time
     if args is None:
         # run with default params
         args = {
@@ -309,7 +312,8 @@ def run_node2vec(graph, eval_set=None, args=None, output_path=None):
     args = Node2VecParams(**args)
 
     # train Node2Vec
-    print("training Node2Vec...")
+    print("training Node2Vec, it will take a while...")
+    print("node2vec's arguments:", args)
     trainer = Node2vecModel(graph,
                             embedding_dim=args.embedding_dim,
                             walk_length=args.walk_length,
@@ -323,6 +327,9 @@ def run_node2vec(graph, eval_set=None, args=None, output_path=None):
 
     trainer.train(epochs=args.epochs, batch_size=args.batch_size, learning_rate=args.learning_rate)
 
+    t_tock = time.time()
+
+    print(f"done training node2vec, running time = {np.round((t_tock - t_tick) / 60)}")
     # Calc embedding
     embedding = trainer.embedding().data
 

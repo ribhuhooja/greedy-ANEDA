@@ -1,11 +1,13 @@
 import os
 from collections import Counter
+from typing import Dict
 
 import dgl
 import dill
 import numpy as np
 import scipy
 from sklearn.model_selection import train_test_split
+from tqdm import tqdm
 
 
 def load_edgelist_file_to_dgl_graph(path: str, undirected: bool, edge_weights=None):
@@ -59,7 +61,7 @@ def read_file(path):
     return generator
 
 
-def train_valid_test_split(x, y, test_size=0.2, val_size=0.2, output_path=None, file_name=None, shuffle=True,
+def train_valid_test_split(x, y, write_train_val_test, test_size=0.2, val_size=0.2, output_path=None, file_name=None, shuffle=True,
                            random_seed=None):
     x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=test_size, random_state=random_seed,
                                                         shuffle=shuffle, stratify=y)
@@ -76,7 +78,11 @@ def train_valid_test_split(x, y, test_size=0.2, val_size=0.2, output_path=None, 
     datasets["y_val"] = y_val
     datasets["x_test"] = x_test
     datasets["y_test"] = y_test
-    write_file(os.path.join(output_path, f"{file_name}_train_val_test.pkl"), datasets)
+
+    if write_train_val_test:
+        print(f"writing train_val_test datasets for {file_name}...")
+        write_file(os.path.join(output_path, f"{file_name}_train_val_test.pkl"), datasets)
+        print(f"Done writing train_val_test for {file_name}")
 
     return datasets
 
@@ -91,3 +97,37 @@ def remove_data_with_a_few_observations(x, y, min_observations=6):
 
     print('{} rows removed from the dataset'.format(original_len - len(y)))
     return x, y
+
+
+def create_dataset(distance_map: Dict, embedding, binary_operator="average"):
+    """
+    create dataset in which each data point (x,y) is (the embedding of 2 nodes, its distance)
+    :param distance_map: dictionary (key, value)=(landmark_node, list_distance_to_each_node_n)
+    :param embedding: embedding vectors of the nodes
+    :param binary_operator: ["average", "concatenation", "subtraction", "hadamard"]
+    :return: return 2 arrays:  array of data and array of labels.
+    """
+    if binary_operator not in ["average", "concatenation", "subtraction", "hadamard"]:
+        raise ValueError(f"binary_operator is not valid!: {binary_operator}")
+
+    data_list = []
+    label_list = []
+    node_pairs = set()
+    for landmark in tqdm(distance_map.keys()):
+        distance_list = distance_map[landmark]
+        for node, distance in enumerate(distance_list):
+            pair_key = tuple(sorted([node, landmark]))
+            if node == landmark or distance == np.inf or pair_key in node_pairs:
+                pass
+            else:
+                node_pairs.add(pair_key)
+                if binary_operator == "average":
+                    data = (embedding[node] + embedding[landmark]) / 2.0
+                else:
+                    # TODO: Need to implement other binary operators
+                    raise ValueError(f"binary_operator is not implemented yet!: {binary_operator}")
+                label = distance
+                data_list.append(np.array(data))
+                label_list.append(label)
+
+    return np.array(data_list, dtype=object), np.array(label_list, dtype=np.int16)

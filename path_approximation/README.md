@@ -21,14 +21,15 @@
   
     ```
     pip install -r requirements.txt
-    python src/main.py
+    cd src
+    python main.py
     ```
   + Current ideas:
     Similar to the 2018 paper, modify step 3 and 4:
 
     3'. <br>
-          &nbsp;   + 3'.1. Use all the nodes as landmark nodes<br>
-          &nbsp;   + 3'.2. Still pick some nodes as landmarks, but instead of choosing randomly, we [choose high-degree nodes](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/msr-tr-2009-84.pdf) <br>
+          &nbsp;   + 3'.a. Use all the nodes as landmark nodes<br>
+          &nbsp;   + 3'.b. Still pick some nodes as landmarks, but instead of choosing randomly, we [choose high-degree nodes](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/msr-tr-2009-84.pdf) <br>
     4'. Use all data as the training set (try to overfit the model)
 
 
@@ -36,5 +37,15 @@
 - [x] Create datasets 
 - [x] Linear model
 - [ ] [Neural Net](https://github.com/BU-Lisp/dl-hyperbolic-random-graphs/blob/main/path_approximation/src/models.py)
+- [ ] More experiments 
+  - [ ] [Graphs](https://networkrepository.com): Different types of graphs (e.g., road networks, internet graphs), different sizes (small vs. large graphs)
+  - [ ] Node2Vec: More dimensions (e.g., 256, 512,...), different `#epochs` to train node2vec. Any relations between type of graph and `#embedding_dimensions`?
+  - [ ] Model: network's architecture, `#epochs`,..
+  - [ ] ...
 - [ ] Evaluation
 
+
+#### Notes
+- If you get some errors with `dgl`, try to use `conda` to re-install it:
+`conda install -c dglteam dgl`.
+Refer to [here](https://docs.dgl.ai/en/0.7.x/install/index.html) for more detail.
