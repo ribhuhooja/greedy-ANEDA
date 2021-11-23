@@ -7,6 +7,14 @@ from imblearn.under_sampling import RandomUnderSampler
 import models
 from datasets_generator import create_train_val_test_sets
 
+def run_nn(file_name,force_recreate_datasets,write_train_val_test,logs_path = 'logs'):
+    logging.basicConfig(filename=f'../output/{logs_path}/running_log.log', level=logging.INFO)
+    datasets = create_train_val_test_sets(file_name, force_recreate_datasets=force_recreate_datasets,
+                                          write_train_val_test=write_train_val_test)
+    scores = models.run_neural_net(datasets)
+    
+    logging.info("run_nn")
+    logging.info(scores)
 
 def run_some_linear_models(file_name, force_recreate_datasets, write_train_val_test, logs_path="logs"):
     """
