@@ -36,10 +36,16 @@
 #### TODO
 - [x] Create datasets 
 - [x] Linear model
-- [ ] [Neural Net](https://github.com/BU-Lisp/dl-hyperbolic-random-graphs/blob/main/path_approximation/src/models.py)
+- [x] [Neural Net](https://github.com/BU-Lisp/dl-hyperbolic-random-graphs/blob/main/path_approximation/src/models.py)
 - [ ] More experiments 
+  - [ ] Landmarks:
+        + Use all the nodes as landmark nodes
+        + Choose some high-degree nodes rather than random nodes
   - [ ] [Graphs](https://networkrepository.com): Different types of graphs (e.g., road networks, internet graphs), different sizes (small vs. large graphs)
-  - [ ] Node2Vec: More dimensions (e.g., 256, 512,...), different `#epochs` to train node2vec. Any relations between type of graph and `#embedding_dimensions`?
+  - [ ] Node2Vec: 
+        + More dimensions (e.g., 256, 512,...)
+        + *Different `#epochs` to train node2vec.* 
+        + Any relations between type of graph and `#embedding_dimensions`?
   - [ ] Model: network's architecture, `#epochs`,..
   - [ ] ...
 - [ ] Evaluation
