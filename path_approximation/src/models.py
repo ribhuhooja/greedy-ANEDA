@@ -3,6 +3,7 @@ import os
 import time
 import copy
 from utils import *
+from utilities import *
 
 import numpy as np
 from sklearn.linear_model import LinearRegression
@@ -56,25 +57,26 @@ def run_linear_regression(datasets, use_standard_scaler=False, merge_train_val=T
     return scores
 
 
-def run_neural_net(datasets):
+def run_neural_net(datasets,file_name):
     ## TODO:
     ## Should start off with whatever we already had
     ## Refer to https://github.com/kryptokommunist/path-length-approximation-deep-learning/blob/master/src/trainer.py
     
-    params = {'batch_size': 1000,  'hidden_units_1': 200, 'hidden_units_2': 100, 'hidden_units_3': 50, 
+    params = {'batch_size': 500,  'hidden_units_1': 200, 'hidden_units_2': 100, 'hidden_units_3': 50, 
               'do_1': 0.2, 'do_2': 0.1, 'do_3': 0.05, 'output_size': 1, 'lr': 0.001, 'min_lr': 1e-5, 
-              'max_lr': 1e-3, 'epochs': 200, 'lr_sched': 'clr', 'lr_sched_mode': 'triangular', 
+              'max_lr': 1e-3, 'epochs': 150, 'lr_sched': 'clr', 'lr_sched_mode': 'triangular', 
               'gamma': 0.95}
-
-    emb_dims =  [16, 32, 64, 128, 256]#, 32, 64, 128, 256]# 512, 1024, 2048]
     device = "cuda"
     
-
+    
     scores = {}
+    #return datasets
     x_train, y_train = datasets["x_train"].astype(np.float32), datasets["y_train"].astype(np.float32)
     x_valid, y_valid = datasets["x_val"].astype(np.float32),datasets['y_val'].astype(np.float32)
     x_test, y_test = datasets["x_test"].astype(np.float32), datasets["y_test"].astype(np.float32)
     params['input_size'] = x_train.shape[1]
+    
+    #x_train,y_train = unison_shuffle_copies(x_train, y_train)
     trainset = torch_data.TensorDataset(torch.as_tensor(x_train, dtype=torch.float, device=device), torch.as_tensor(y_train, dtype=torch.float, device=device))
     train_dl = torch_data.DataLoader(trainset, batch_size=params['batch_size'], drop_last=True)
     val_dl = torch_data.DataLoader(torch_data.TensorDataset(torch.as_tensor(x_valid, dtype=torch.float, device=device), torch.as_tensor(y_valid, dtype=torch.float, device=device)), batch_size=params['batch_size'], drop_last=True)
@@ -83,6 +85,19 @@ def run_neural_net(datasets):
     values, counts = np.unique(y_train, return_counts=True)
     max_dist = math.ceil(max(values))  # have questions: why it is a float
     
+    def ensure_folders_exist(path):
+        """
+        Creates folders that do not exist yet on the given path
+        """
+        if not os.path.exists(os.path.dirname(path)):
+            try:
+                os.makedirs(os.path.dirname(path))
+            except OSError as exc: # Guard against race condition
+                if exc.errno != errno.EEXIST:
+                    raise
+                    
+    path = f"../output/nn_return/{file_name}"
+    ensure_folders_exist(path)
     
     def get_test_scores( model, best_model_path, test_dl, loss_fn, writer, lrs):
         print("Saving test scores")
@@ -157,22 +172,11 @@ def run_neural_net(datasets):
         result = {"acc": acc_score, "mse": mse, "mae": mae, "mre": mre, "lr_arr": lr_arr[:len(lrs)],
             "dist_accuracies": dist_accuracies, "dist_mae": dist_mae, "dist_mre": dist_mre,
             "dist_mse": dist_mse, "dist_counts": dist_counts}   
-        print(result)
         return result
     
-    def ensure_folders_exist(path):
-        """
-        Creates folders that do not exist yet on the given path
-        """
-        if not os.path.exists(os.path.dirname(path)):
-            try:
-                os.makedirs(os.path.dirname(path))
-            except OSError as exc: # Guard against race condition
-                if exc.errno != errno.EEXIST:
-                    raise
     
-    path = f"../output/nn_return"
-    ensure_folders_exist(path)
+    
+  
 
     def poisson_loss(y_pred, y_true):
             """
@@ -193,19 +197,22 @@ def run_neural_net(datasets):
             model = torch.nn.Sequential(
                 torch.nn.Linear(params['input_size'], params['hidden_units_1']),
                 torch.nn.BatchNorm1d(params['hidden_units_1']),
-                # torch.nn.Dropout(p=params['do_1']),
-                torch.nn.ReLU(),
+                #torch.nn.Dropout(p=params['do_1']),
+                #torch.nn.ReLU(),
+                torch.nn.Softplus(),
                 torch.nn.Linear(params['hidden_units_1'], params['hidden_units_2']),
                 torch.nn.BatchNorm1d(params['hidden_units_2']),
-                # torch.nn.Dropout(p=params['do_2']),
-                torch.nn.ReLU(),
+                #torch.nn.Dropout(p=params['do_2']),
+                #torch.nn.ReLU(),
+                torch.nn.Softplus(),
                 torch.nn.Linear(params['hidden_units_2'], params['hidden_units_3']),
                 torch.nn.BatchNorm1d(params['hidden_units_3']),
-                # torch.nn.Dropout(p=params['do_3']),
-                torch.nn.ReLU(),
+                #torch.nn.Dropout(p=params['do_3']),
+                #torch.nn.ReLU(),
+                torch.nn.Softplus(),
                 torch.nn.Linear(params['hidden_units_3'], params['output_size']),
-                torch.nn.ReLU(),
-                # torch.nn.Softplus(),
+                #torch.nn.ReLU(),
+                torch.nn.Softplus(),
             )
             model.to(device)
             return model
@@ -457,15 +464,15 @@ def run_neural_net(datasets):
             
     writer.add_text('class avg accuracy', str(np.mean(scores["nn"]["dist_accuracies"])))
     print('class avg accuracy', np.mean(scores["nn"]["dist_accuracies"]))
-    mse = str(scores["nn"]["mse"])
-    mae = str(scores["nn"]["mae"])
-    mre = str(scores["nn"]["mre"])
-    writer.add_text('MSE', mse)
-    print('MSE', mse)
-    writer.add_text('MAE', mae)
-    print('MAE', mae)
-    writer.add_text('MRE', mre)
-    print('MRE', mre)   
+    mse = (scores["nn"]["mse"])
+    mae = (scores["nn"]["mae"])
+    mre = (scores["nn"]["mre"])
+    writer.add_text('MSE', str(mse))
+    print('MSE', str(mse))
+    writer.add_text('MAE', str(mae))
+    print('MAE', str(mae))
+    writer.add_text('MRE', str(mre))
+    print('MRE', str(mre))   
     metrics = {"acc": np.mean(scores["nn"]["dist_accuracies"]), "mse": mse, "mae": mae,
               "mre": mre}
     return metrics

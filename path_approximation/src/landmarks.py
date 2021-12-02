@@ -7,6 +7,11 @@ from tqdm import tqdm
 from data_helper import write_file
 
 
+def get_landmark_custom(g: nx.Graph,portion):
+    ## sort node accoding to degrees
+    s = sorted(g.degree, key=lambda x: x[1], reverse=True)
+    landmark_nodes = [node[0] for node in s[:int(len(s) * portion)]]
+    return landmark_nodes
 def get_landmark_nodes(num_landmarks: int, graph: nx.Graph, random_seed: int = None) -> List:
     """
     Given a graph, return `num_landmarks` random nodes in the graph.
