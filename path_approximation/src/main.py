@@ -25,11 +25,16 @@ if __name__ == '__main__':
     And other tests also have the same probelms when we deal with small graphs like inf-euroroad
     method can be either random or top_degrees
     """
-    # # get_ipython().magic('reset -sf')# clean shell varaible
-    # graph_name = 'socfb-American75'
-    # run_nn(file_name=graph_name, force_recreate_datasets=False, portion = 0.2,method = "top_degrees",write_train_val_test=False)
-    # # shutil.rmtree("../output/nn_return/{}".format(graph_name))# just remove all the created files by run_nn
-    #
+    graphs = ['ego-facebook-original','socfb-American75']
+    portions = [0.02,0.03,0.04,0.05,0.06,0.07,0.08]
+    methods = ['random','high_degree','high_low_degree']
+    for graph_name in graphs:
+        for method in methods:
+            for portion in portions:
+                run_nn(file_name=graph_name, force_recreate_datasets=True, portion = portion,method = method,write_train_val_test=False)
+                cmd = "rm -r " + "../output/nn_return/{}".format(graph_name)
+                os.system(cmd)
+    
     """
     graph = ['fb-pages-food']
     portions = [0.2,0.3,0.4,0.5,0.6,0.7,0.8]

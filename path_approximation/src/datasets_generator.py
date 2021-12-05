@@ -46,8 +46,10 @@ def create_train_val_test_sets(config, force_recreate_datasets, write_train_val_
         landmark_nodes = landmarks.get_landmark_nodes(num_landmarks, nx_graph, random_seed=random_seed)
     elif sample_method == 'high_degree':
         landmark_nodes = landmarks.get_landmark_custom(nx_graph, portion=sample_ratio)
+    elif sample_method == "high_and_low_degree":
+        landmark_nodes = landmarks.get_landmark_custom2(nx_graph, portion=sample_ratio)
     else:
-        raise ValueError(f"landmark sampling method should be in [random, high_degree], instead of {sample_method}!")
+        raise ValueError(f"landmark sampling method should be in [random, high_degree, high_and_low_degree], instead of {sample_method}!")
 
     # TODO: when all nodes are landmark nodes, might need a better way to calc the distance (symmetric matrix)
 

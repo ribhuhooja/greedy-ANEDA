@@ -8,11 +8,23 @@ from data_helper import write_file
 
 
 def get_landmark_custom(g: nx.Graph, portion):
+    """
+    picks those nodes with high-degree
+    """
     ## sort node according to degrees
     s = sorted(g.degree, key=lambda x: x[1], reverse=True)
     landmark_nodes = [node[0] for node in s[:int(len(s) * portion)]]
     return landmark_nodes
 
+
+def get_landmark_custom2(g: nx.Graph,portion):
+    """
+    picks a mix of high-degree and low-degree nodes (half-half)
+    """
+    s = sorted(g.degree, key=lambda x: x[1], reverse=True)
+    landmark_nodes_high = [node[0] for node in s[:int(len(s) * (portion/2))]]
+    landmark_nodes_low = [node[0] for node in s[-int(len(s) * (portion/2)):]]
+    return landmark_nodes_high + landmark_nodes_low
 
 def get_landmark_nodes(num_landmarks: int, graph: nx.Graph, random_seed: int = None) -> List:
     """
