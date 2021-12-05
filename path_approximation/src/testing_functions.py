@@ -6,36 +6,9 @@ from imblearn.under_sampling import RandomUnderSampler
 
 import models
 from datasets_generator import create_train_val_test_sets
-from datetime import datetime
 
 
-def round_num(scores):
-    """
-    round all the scores number 
     
-    return a dictionary 
-    """
-    for score in scores:
-        scores[score] = str(round(scores[score],4))
-    return scores
-def run_nn(file_name,force_recreate_datasets,write_train_val_test,portion,method,logs_path = 'logs'):
-    """
-    Run Neural Neworks on dataset
-    
-    :param portion: pick what portion of nodes out of total nodes in network as landmarks
-    :param method: decide how we pick the nodes, can be either random or top_degrees(rank all the nodes accoding to their degrees)  
-    
-    """
-    now = datetime.now() 
-    logging.basicConfig(filename=f'../output/{logs_path}/running_log.log', level=logging.INFO)
-    datasets = create_train_val_test_sets(file_name, force_recreate_datasets=force_recreate_datasets,
-                                     write_train_val_test=write_train_val_test,portion = portion,method = method)
-    scores = models.run_neural_net(datasets, file_name)
-    
-    logging.info("run nn on " + file_name + " at " + now.strftime("%m/%d/%Y %H:%M:%S ") + "{}%".format(float(portion)) +" " + method)
-    logging.info(round_num(scores))
-    logging.info("#################")
-
 def run_some_linear_models(file_name, force_recreate_datasets, write_train_val_test, logs_path="logs"):
     """
     Testing purpose.
