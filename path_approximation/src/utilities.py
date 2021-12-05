@@ -3,7 +3,7 @@ from typing import Tuple, Dict
 
 import matplotlib.pyplot as plt
 import networkx as nx
-
+import numpy as np
 
 def make_log_folder(log_folder_name="logs"):
     if not os.path.exists("../output"):
@@ -36,3 +36,9 @@ def plot_nx_graph(nx_g: nx.Graph, fig_size: Tuple = (15, 7), options: Dict = Non
     plt.savefig(f'../plots/{file_name}_pic.png')
     plt.show()
     return None
+
+
+def unison_shuffle_copies(a, b):
+    assert len(a) == len(b)
+    p = np.random.permutation(len(a))
+    return a[p], b[p]

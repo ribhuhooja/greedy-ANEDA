@@ -6,9 +6,75 @@ from imblearn.under_sampling import RandomUnderSampler
 
 import models
 from datasets_generator import create_train_val_test_sets
+from datetime import datetime
 
 
+from torch import tensor,reshape
+from sklearn.metrics import accuracy_score, mean_absolute_error,mean_squared_error,mean_absolute_percentage_error
+
+
+
+
+## functions as tools 
+
+
+def get_test_result(file_name,portion,seed,model):
+    """
+    test model on random selected pari of nodes from the graph
     
+    :param: file_name working data graph
+    :param: portion, the portion of test data out of total data
+    :seed: random seed
+    
+    :return x_test,y_test
+    
+    """
+    data = create_train_val_test_sets(file_name, True, False,portion,"random",seed)
+    x,y = tensor(data['x_train'].astype(np.float32)),tensor(data['y_train'].astype(np.float32)) # just for convinience, that's for test not for train
+    pred = [model(reshape(input_, (1, input_.size()[0])).to("cuda")).tolist()[0][0] for input_ in x]# use model to predict
+    return accuracy_score(np.round(pred),y),mean_absolute_error(pred,y),mean_squared_error(pred,y),mean_absolute_percentage_error(pred,y)
+
+
+
+def round_num(scores):
+    """
+    round all the scores number 
+    
+    return a dictionary 
+    """
+    for score in scores:
+        scores[score] = str(round(scores[score],4))
+    return scores
+
+
+
+#####################
+
+
+
+def run_nn(file_name,force_recreate_datasets,write_train_val_test,portion,method,logs_path = 'logs'):
+    """
+    Run Neural Neworks on dataset
+    
+    :param portion: pick what portion of nodes out of total nodes in network as landmarks
+    :param method: decide how we pick the nodes, can be either random or top_degrees(rank all the nodes accoding to their degrees)  
+    
+    
+    :return model: a nn model
+    """
+    now = datetime.now() 
+    logging.basicConfig(filename=f'../output/{logs_path}/running_log.log', level=logging.INFO)
+    datasets = create_train_val_test_sets(file_name, force_recreate_datasets=force_recreate_datasets,
+                                     write_train_val_test=write_train_val_test,portion = portion,method = method,seed = 2021)
+    model = models.run_neural_net(datasets, file_name)
+    logging.info("run nn on " + file_name + " at " + now.strftime("%m/%d/%Y %H:%M:%S ") + "{}%".format(float(portion) *100) +" " + method)
+    acc,mae,mse,mre = get_test_result(file_name,0.14,824,model) # for small graph, we can have large portion of data to test, but for large graph
+                                                       # chose smaller portion to save time
+    logging.info("ACC " + str(round(acc,4) * 100) + "%" + " ||| " + "MAE: " + str(round(mae,4)))
+    logging.info("MSE " + str(round(mse,4)) + " ||| " + "MRE: " + str(round(mre,4)))
+    logging.info("------------------------")
+    return model
+
 def run_some_linear_models(file_name, force_recreate_datasets, write_train_val_test, logs_path="logs"):
     """
     Testing purpose.
