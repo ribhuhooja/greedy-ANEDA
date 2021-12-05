@@ -3,15 +3,19 @@ import shutil
 from testing_functions import run_some_linear_models,run_nn
 from IPython import get_ipython
 import time
+from utilities import read_yaml
+
 if __name__ == '__main__':
-    make_log_folder(log_folder_name="logs")
+    data_generator_config = read_yaml("../configs/data_generator.yaml")
+    make_log_folder(log_folder_name=data_generator_config["log_path"])
+
     # run_linear_model_with_under_and_over_sampling(file_name="socfb-American75", force_recreate_datasets=False, write_train_val_test=False)
     ## result: linear_regression: Accuracy=52.527%, MSE=0.492, MAE=0.558, MRE=0.2
-    #run_some_linear_models(file_name="fb-pages-food", force_recreate_datasets=True, write_train_val_test=False)
+
+    run_some_linear_models(data_generator_config, force_recreate_datasets=True, write_train_val_test=False)
     ## result: linear_regression: Accuracy = 69.712 %, MSE = 0.248, MAE = 0.393, MRE = 0.16
-    
-    
-    #graph = ["as-internet","socfb-American75","socfb-OR"]
+
+    # graph = ["as-internet","socfb-American75","socfb-OR"]
     """
     run portion = 0.2, method = top_degrees, you can get many possiable results(stored in log files) like below, which doesn't make sense', 
     since all the data is the same for every run, then all the accuracy and mae should also be same
@@ -21,11 +25,11 @@ if __name__ == '__main__':
     And other tests also have the same probelms when we deal with small graphs like inf-euroroad
     method can be either random or top_degrees
     """
-    get_ipython().magic('reset -sf')# clean shell varaible 
-    graph_name = 'fb-pages-food'
-    run_nn(file_name=graph_name, force_recreate_datasets=True, portion = 0.2,method = "top_degrees",write_train_val_test=False)
-    shutil.rmtree("../output/nn_return/{}".format(graph_name))# just remove all the created files by run_nn
-    
+    # # get_ipython().magic('reset -sf')# clean shell varaible
+    # graph_name = 'socfb-American75'
+    # run_nn(file_name=graph_name, force_recreate_datasets=False, portion = 0.2,method = "top_degrees",write_train_val_test=False)
+    # # shutil.rmtree("../output/nn_return/{}".format(graph_name))# just remove all the created files by run_nn
+    #
     """
     graph = ['fb-pages-food']
     portions = [0.2,0.3,0.4,0.5,0.6,0.7,0.8]

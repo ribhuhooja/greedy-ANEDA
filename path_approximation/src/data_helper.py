@@ -81,7 +81,7 @@ def train_valid_test_split(x, y, write_train_val_test, test_size=0.2, val_size=0
 
     if write_train_val_test:
         print(f"writing train_val_test datasets for {file_name}...")
-        write_file(os.path.join(output_path, f"{file_name}_train_val_test.pkl"), datasets)
+        write_file(output_path, datasets)
         print(f"Done writing train_val_test for {file_name}")
 
     return datasets
@@ -101,7 +101,7 @@ def remove_data_with_a_few_observations(x, y, min_observations=6):
 
 def create_dataset(distance_map: Dict, embedding, binary_operator="average"):
     """
-    create dataset in which each data point (x,y) is (the embedding of 2 nodes, its distance)
+    create data_generator.yaml in which each data point (x,y) is (the embedding of 2 nodes, its distance)
     :param distance_map: dictionary (key, value)=(landmark_node, list_distance_to_each_node_n)
     :param embedding: embedding vectors of the nodes
     :param binary_operator: ["average", "concatenation", "subtraction", "hadamard"]

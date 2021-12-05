@@ -1,0 +1,27 @@
+random_seed: 42
+data:
+  file_name: socfb-American75 #["as-internet","socfb-American75","socfb-OR"]
+  input_path: "../data/{file_name}.edgelist"
+  embedding_output_path: "../output/embedding/{file_name}_embed-epochs{epochs}-lr{lr}.pkl"
+  landmark_distance_output_path: "../output/landmarks_distance/{file_name}_dist.pkl"
+  final_train_val_test_path: "../output/datasets/{file_name}_train_val_test.pkl"
+node2vec:
+  "device": cuda
+  "embedding_dim": 128
+  "walk_length": 5
+  "window_size": 5
+  "p": 0.2
+  "q": 4
+  "num_walks": 25
+  "epochs": 1
+  "batch_size": 128
+  "lr": 0.01
+landmark:
+  sample_method: random  #[random, high_degree]
+  sample_ratio: 0.2
+plot:
+  plot_nx_graph: False
+train_val_test:
+  test_size: 0.25
+  val_size: 0.15
+log_path: "../output/logs"

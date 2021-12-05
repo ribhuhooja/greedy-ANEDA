@@ -1,4 +1,6 @@
 import logging
+import os.path
+from datetime import datetime
 
 import numpy as np
 from imblearn.over_sampling import RandomOverSampler
@@ -6,7 +8,6 @@ from imblearn.under_sampling import RandomUnderSampler
 
 import models
 from datasets_generator import create_train_val_test_sets
-from datetime import datetime
 
 
 def round_num(scores):
@@ -16,35 +17,41 @@ def round_num(scores):
     return a dictionary 
     """
     for score in scores:
-        scores[score] = str(round(scores[score],4))
+        scores[score] = str(round(scores[score], 4))
     return scores
-def run_nn(file_name,force_recreate_datasets,write_train_val_test,portion,method,logs_path = 'logs'):
+
+
+def run_nn(file_name, force_recreate_datasets, write_train_val_test, portion, method, logs_path='logs'):
     """
-    Run Neural Neworks on dataset
+    Run Neural Neworks on data_generator.yaml
     
     :param portion: pick what portion of nodes out of total nodes in network as landmarks
     :param method: decide how we pick the nodes, can be either random or top_degrees(rank all the nodes accoding to their degrees)  
     
     """
-    now = datetime.now() 
+    now = datetime.now()
     logging.basicConfig(filename=f'../output/{logs_path}/running_log.log', level=logging.INFO)
     datasets = create_train_val_test_sets(file_name, force_recreate_datasets=force_recreate_datasets,
-                                     write_train_val_test=write_train_val_test,portion = portion,method = method)
+                                          write_train_val_test=write_train_val_test, sample_ratio=portion,
+                                          method=method)
     scores = models.run_neural_net(datasets, file_name)
-    
-    logging.info("run nn on " + file_name + " at " + now.strftime("%m/%d/%Y %H:%M:%S ") + "{}%".format(float(portion)) +" " + method)
+
+    logging.info("run nn on " + file_name + " at " + now.strftime("%m/%d/%Y %H:%M:%S ") + "{}%".format(
+        float(portion)) + " " + method)
     logging.info(round_num(scores))
     logging.info("#################")
 
-def run_some_linear_models(file_name, force_recreate_datasets, write_train_val_test, logs_path="logs"):
+
+def run_some_linear_models(config, force_recreate_datasets, write_train_val_test):
     """
     Testing purpose.
     :param file_name:
     :return:
     """
-    logging.basicConfig(filename=f'../output/{logs_path}/running_log.log', level=logging.INFO)
+    log_path = config["log_path"]
+    logging.basicConfig(filename=os.path.join(log_path, "running_log.log"), level=logging.INFO)
 
-    datasets = create_train_val_test_sets(file_name, force_recreate_datasets=force_recreate_datasets,
+    datasets = create_train_val_test_sets(config=config, force_recreate_datasets=force_recreate_datasets,
                                           write_train_val_test=write_train_val_test)
 
     ##### run some linear regression models
@@ -53,16 +60,7 @@ def run_some_linear_models(file_name, force_recreate_datasets, write_train_val_t
     # X.train[0]:  [ 2.40739295 -0.84786797 -0.60399631  1.24751753  0.09072189 -0.34991539 ...
     # linear_regression: Accuracy = 69.712 %, MSE = 0.248, MAE = 0.393, MRE = 0.16
 
-    # models.run_linear_regression(datasets, use_standard_scaler=True, merge_train_val=True)
-    ## X.train:  (708130, 128)
-    ## X.train[0]: [2.4082464 - 0.849042 - 0.60468688  1.2473787   0.08971796 - 0.34934673 ...
-    ## linear_regression: Accuracy=69.705%, MSE=0.248, MAE=0.393, MRE=0.16
-    #
-    # models.run_linear_regression(datasets, use_standard_scaler=False, merge_train_val=False)
-    # # X.train:  (566504, 128)
-    # # X.train[0]: [0.5844107866287231 - 0.15337152779102325 - 0.12185250222682953 ...
-    # # linear_regression: Accuracy = 69.712 %, MSE = 0.248, MAE = 0.393, MRE = 0.16
-    logging.info("run_some_linear_models")
+    logging.info("run_some_linear_models_test!")
     logging.info(scores)
 
     return True

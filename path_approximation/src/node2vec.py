@@ -295,19 +295,7 @@ class Node2vecModel(object):
 def run_node2vec(graph, eval_set=None, args=None, output_path=None):
     t_tick = time.time()  ## start measuring running time
     if args is None:
-        # run with default params
-        args = {
-            "device": "cuda",
-            "embedding_dim": 128,
-            "walk_length": 50,
-            "window_size": 5,
-            "p": 0.25,
-            "q": 4.0,
-            "num_walks": 10,
-            "epochs": 1,  # 100
-            "batch_size": 128,
-            "learning_rate": 0.01,
-        }
+        raise ValueError("need args for node2vec!")
 
     # Convert dict to tuple
     Node2VecParams = namedtuple('Node2VecParams', args)
@@ -327,11 +315,11 @@ def run_node2vec(graph, eval_set=None, args=None, output_path=None):
                             eval_steps=1,
                             device=args.device)
 
-    trainer.train(epochs=args.epochs, batch_size=args.batch_size, learning_rate=args.learning_rate)
+    trainer.train(epochs=args.epochs, batch_size=args.batch_size, learning_rate=args.lr)
 
     t_tock = time.time()
 
-    print(f"done training node2vec, running time = {np.round((t_tock - t_tick) / 60)}")
+    print(f"done training node2vec, running time = {np.round((t_tock - t_tick) / 60)} minutes.")
     # Calc embedding
     embedding = trainer.embedding().data
 

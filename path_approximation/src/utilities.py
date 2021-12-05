@@ -4,6 +4,9 @@ from typing import Tuple, Dict
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
+import yaml
+import json
+
 
 def make_log_folder(log_folder_name="logs"):
     if not os.path.exists("../output"):
@@ -42,3 +45,13 @@ def unison_shuffle_copies(a, b):
     assert len(a) == len(b)
     p = np.random.permutation(len(a))
     return a[p], b[p]
+
+
+def read_json(file_path):
+    with open(file_path, "r") as f:
+        return json.load(f)
+
+
+def read_yaml(file_path):
+    with open(file_path, "r") as f:
+        return yaml.safe_load(f)
