@@ -1,0 +1,33 @@
+##### Config for generating datasets
+## `key: value`, or `key: {key':value}`
+## For tuning parameters, set `value` as a list (e.g.,  `sample_method: ['random', 'high_degree', 'high_and_low_degree']`)
+random_seed: 42
+data:
+  file_name: ['ego-facebook-original', 'socfb-American75'] ## will run with each `file_name` in the list
+  input_path: "../data/{file_name}.edgelist"
+  embedding_output_path: "../output/embedding/{file_name}_embed-epochs{epochs}-lr{lr}.pkl"
+  landmark_distance_output_path: "../output/landmarks_distance/{file_name}_dist.pkl"
+  final_train_val_test_path: "../output/datasets/{file_name}_train_val_test.pkl"
+node2vec:
+  "device": cuda
+  "embedding_dim": 128
+  "walk_length": 5
+  "window_size": 5
+  "p": 0.2
+  "q": 4
+  "num_walks": 25
+  "epochs": 1
+  "batch_size": 128
+  "lr": 0.01
+landmark:
+  sample_method: ['random', 'high_degree', 'high_and_low_degree']
+  sample_ratio: [0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08]
+plot:
+  plot_nx_graph: False
+train_val_test:
+  test_size: 0.25
+  val_size: 0.15
+log_path: "../output/logs"
+force_recreate_datasets: False
+write_train_val_test: False
+parse_tuning_param_by: ->  ## helpful to create a list of configs

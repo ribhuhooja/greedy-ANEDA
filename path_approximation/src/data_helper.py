@@ -1,3 +1,4 @@
+import json
 import os
 from collections import Counter
 from typing import Dict
@@ -6,6 +7,7 @@ import dgl
 import dill
 import numpy as np
 import scipy
+import yaml
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
@@ -61,7 +63,18 @@ def read_file(path):
     return generator
 
 
-def train_valid_test_split(x, y, write_train_val_test, test_size=0.2, val_size=0.2, output_path=None, file_name=None, shuffle=True,
+def read_json(file_path):
+    with open(file_path, "r") as f:
+        return json.load(f)
+
+
+def read_yaml(file_path):
+    with open(file_path, "r") as f:
+        return yaml.safe_load(f)
+
+
+def train_valid_test_split(x, y, write_train_val_test, test_size=0.2, val_size=0.2, output_path=None, file_name=None,
+                           shuffle=True,
                            random_seed=None):
     x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=test_size, random_state=random_seed,
                                                         shuffle=shuffle, stratify=y)
@@ -81,7 +94,7 @@ def train_valid_test_split(x, y, write_train_val_test, test_size=0.2, val_size=0
 
     if write_train_val_test:
         print(f"writing train_val_test datasets for {file_name}...")
-        write_file(os.path.join(output_path, f"{file_name}_train_val_test.pkl"), datasets)
+        write_file(output_path, datasets)
         print(f"Done writing train_val_test for {file_name}")
 
     return datasets
@@ -101,7 +114,7 @@ def remove_data_with_a_few_observations(x, y, min_observations=6):
 
 def create_dataset(distance_map: Dict, embedding, binary_operator="average"):
     """
-    create dataset in which each data point (x,y) is (the embedding of 2 nodes, its distance)
+    create data_generator.yaml in which each data point (x,y) is (the embedding of 2 nodes, its distance)
     :param distance_map: dictionary (key, value)=(landmark_node, list_distance_to_each_node_n)
     :param embedding: embedding vectors of the nodes
     :param binary_operator: ["average", "concatenation", "subtraction", "hadamard"]
