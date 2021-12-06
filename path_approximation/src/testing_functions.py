@@ -3,25 +3,19 @@ import os.path
 from datetime import datetime
 
 import numpy as np
+import torch.cuda
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
+from sklearn.metrics import accuracy_score, mean_absolute_error, mean_squared_error, mean_absolute_percentage_error
+from torch import tensor, reshape
 
 import models
 from datasets_generator import create_train_val_test_sets
 
 
-from torch import tensor,reshape
-from sklearn.metrics import accuracy_score, mean_absolute_error,mean_squared_error,mean_absolute_percentage_error
-
-
-
-
-## functions as tools
-
-
-def get_test_result(file_name,portion,seed,model):
+def get_test_result(file_name, portion, seed, model):
     """
-    test model on random selected pari of nodes from the graph
+    test model on random selected pair of nodes from the graph
 
     :param: file_name working data graph
     :param: portion, the portion of test data out of total data
@@ -30,11 +24,15 @@ def get_test_result(file_name,portion,seed,model):
     :return x_test,y_test
 
     """
-    data = create_train_val_test_sets(file_name, True, False,portion,"random",seed)
-    x,y = tensor(data['x_train'].astype(np.float32)),tensor(data['y_train'].astype(np.float32)) # just for convinience, that's for test not for train
-    pred = [model(reshape(input_, (1, input_.size()[0])).to("cuda")).tolist()[0][0] for input_ in x]# use model to predict
-    return accuracy_score(np.round(pred),y),mean_absolute_error(pred,y),mean_squared_error(pred,y),mean_absolute_percentage_error(pred,y)
-
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    data = create_train_val_test_sets(file_name, True, False, portion, "random", seed)
+    x, y = tensor(data['x_train'].astype(np.float32)), tensor(
+        data['y_train'].astype(np.float32))  # just for convinience, that's for test not for train
+    pred = [model(reshape(input_, (1, input_.size()[0])).to(device)).tolist()[0][0] for input_ in
+            x]  # use model to predict
+    return accuracy_score(np.round(pred), y), mean_absolute_error(pred, y), mean_squared_error(pred,
+                                                                                               y), mean_absolute_percentage_error(
+        pred, y)
 
 
 def round_num(scores):
@@ -48,33 +46,35 @@ def round_num(scores):
     return scores
 
 
-
 #####################
 
 
-
-
-
-def run_nn(file_name, force_recreate_datasets, write_train_val_test, portion, method, logs_path='logs'):
+def run_nn(config):
     """
-    Run Neural Neworks on dataset
-    
-    :param portion: pick what portion of nodes out of total nodes in network as landmarks
-    :param method: decide how we pick the nodes, can be either random or top_degrees(rank all the nodes accoding to their degrees)  
-    
-
-    :return model: a nn model
+    Run Neural Network Model
+    :param config: provide all we need in terms of parameters
+    :param force_recreate_datasets:
+    :param write_train_val_test:
+    :return: a neural net model
     """
+
     now = datetime.now()
-    logging.basicConfig(filename=f'../output/{logs_path}/running_log.log', level=logging.INFO)
-    datasets = create_train_val_test_sets(file_name, force_recreate_datasets=force_recreate_datasets,
-                                     write_train_val_test=write_train_val_test,portion = portion,method = method,seed = 2021)
+
+    logging.basicConfig(filename=os.path.join(config["log_path"], "running_log.log"), level=logging.INFO)
+    datasets = create_train_val_test_sets(config=config)
+
+    file_name = config["data"]["file_name"]
+    portion = config["landmark"]["sample_ratio"]
+    method = config["landmark"]["sample_method"]
+
     model = models.run_neural_net(datasets, file_name)
-    logging.info("run nn on " + file_name + " at " + now.strftime("%m/%d/%Y %H:%M:%S ") + "{}%".format(float(portion) *100) +" " + method)
-    acc,mae,mse,mre = get_test_result(file_name,0.14,824,model) # for small graph, we can have large portion of data to test, but for large graph
-                                                       # chose smaller portion to save time
-    logging.info("ACC " + str(round(acc,4) * 100) + "%" + " ||| " + "MAE: " + str(round(mae,4)))
-    logging.info("MSE " + str(round(mse,4)) + " ||| " + "MRE: " + str(round(mre,4)))
+    logging.info("run nn on " + file_name + " at " + now.strftime("%m/%d/%Y %H:%M:%S ") + "{}%".format(
+        float(portion) * 100) + " " + method)
+    acc, mae, mse, mre = get_test_result(file_name, 0.14, 824,
+                                         model)  # for small graph, we can have large portion of data to test, but for large graph
+    # chose smaller portion to save time
+    logging.info("ACC " + str(round(acc, 4) * 100) + "%" + " ||| " + "MAE: " + str(round(mae, 4)))
+    logging.info("MSE " + str(round(mse, 4)) + " ||| " + "MRE: " + str(round(mre, 4)))
     logging.info("------------------------")
     return model
 
@@ -93,9 +93,6 @@ def run_some_linear_models(config, force_recreate_datasets, write_train_val_test
 
     ##### run some linear regression models
     scores = models.run_linear_regression(datasets, use_standard_scaler=True, merge_train_val=False)
-    # X.train:  (566,504, 128)
-    # X.train[0]:  [ 2.40739295 -0.84786797 -0.60399631  1.24751753  0.09072189 -0.34991539 ...
-    # linear_regression: Accuracy = 69.712 %, MSE = 0.248, MAE = 0.393, MRE = 0.16
 
     logging.info("run_some_linear_models_test!")
     logging.info(scores)

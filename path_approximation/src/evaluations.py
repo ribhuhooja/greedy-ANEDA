@@ -1,10 +1,5 @@
 import numpy as np
-
 from sklearn.metrics import accuracy_score, mean_absolute_error, mean_absolute_percentage_error, mean_squared_error
-from sklearn.preprocessing import StandardScaler
-from torch.utils import data as torch_data
-from torch.utils.tensorboard import SummaryWriter
-from torchsummary import summary
 
 from metrics import mean_absolute_percentage_error
 

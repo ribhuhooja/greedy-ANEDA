@@ -6,15 +6,15 @@ import data_helper
 import landmarks
 import node2vec
 from data_helper import read_file
-from utilities import plot_nx_graph
+from utils import plot_nx_graph
 
 
-def create_train_val_test_sets(config, force_recreate_datasets, write_train_val_test):
+def create_train_val_test_sets(config):
     file_name = config["data"]["file_name"]
     random_seed = config["random_seed"]
 
     final_output_path = config["data"]["final_train_val_test_path"].format(file_name=file_name)
-    if (not force_recreate_datasets) and os.path.isfile(final_output_path):  ## if the file already exists
+    if (not config["force_recreate_datasets"]) and os.path.isfile(final_output_path):  ## if the file already exists
         print(f"datasets for '{file_name}' already exists, only read them back!")
         return read_file(final_output_path)
 
@@ -49,7 +49,8 @@ def create_train_val_test_sets(config, force_recreate_datasets, write_train_val_
     elif sample_method == "high_and_low_degree":
         landmark_nodes = landmarks.get_landmark_custom2(nx_graph, portion=sample_ratio)
     else:
-        raise ValueError(f"landmark sampling method should be in [random, high_degree, high_and_low_degree], instead of {sample_method}!")
+        raise ValueError(
+            f"landmark sampling method should be in [random, high_degree, high_and_low_degree], instead of {sample_method}!")
 
     # TODO: when all nodes are landmark nodes, might need a better way to calc the distance (symmetric matrix)
 
@@ -72,6 +73,7 @@ def create_train_val_test_sets(config, force_recreate_datasets, write_train_val_
     val_size = config["train_val_test"]["val_size"]
     datasets = data_helper.train_valid_test_split(x, y, test_size=test_size, val_size=val_size,
                                                   output_path=final_output_path,
-                                                  file_name=file_name, write_train_val_test=write_train_val_test,
+                                                  file_name=file_name,
+                                                  write_train_val_test=config["write_train_val_test"],
                                                   random_seed=random_seed)
     return datasets

@@ -1,3 +1,4 @@
+import json
 import os
 from collections import Counter
 from typing import Dict
@@ -6,6 +7,7 @@ import dgl
 import dill
 import numpy as np
 import scipy
+import yaml
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
@@ -61,7 +63,18 @@ def read_file(path):
     return generator
 
 
-def train_valid_test_split(x, y, write_train_val_test, test_size=0.2, val_size=0.2, output_path=None, file_name=None, shuffle=True,
+def read_json(file_path):
+    with open(file_path, "r") as f:
+        return json.load(f)
+
+
+def read_yaml(file_path):
+    with open(file_path, "r") as f:
+        return yaml.safe_load(f)
+
+
+def train_valid_test_split(x, y, write_train_val_test, test_size=0.2, val_size=0.2, output_path=None, file_name=None,
+                           shuffle=True,
                            random_seed=None):
     x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=test_size, random_state=random_seed,
                                                         shuffle=shuffle, stratify=y)
