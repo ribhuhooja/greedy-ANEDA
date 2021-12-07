@@ -67,8 +67,8 @@ def evaluate_model(model, loss_fn, val_loader, device, evaluate_function=None):
 
             if evaluate_function:
                 if device != "cpu":
-                    yhat_list.append(yhat.cpu.numpy())
-                    ytrue_list.append(y_val.cpu.numpy())
+                    yhat_list.append(yhat.cpu().numpy())
+                    ytrue_list.append(y_val.cpu().numpy())
                 else:
                     yhat_list.append(yhat)
                     ytrue_list.append(y_val)

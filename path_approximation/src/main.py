@@ -20,11 +20,11 @@ if __name__ == '__main__':
     dataset = create_train_val_test_sets(data_generator_config)
 
     for i, config in enumerate(config_list):
-        now = datetime.now()
         logging.basicConfig(filename=os.path.join(config["log_path"], "running_log.log"), level=logging.INFO)
+        logging.info("Start: " + config["data"]["file_name"] + " at " + datetime.now().strftime("%m/%d/%Y %H:%M:%S "))
 
         dataset = create_train_val_test_sets(config)
         val_metrics = train_neural_net(dataset)
-        logging.info("run nn on " + config["data"]["file_name"] + " at " + now.strftime("%m/%d/%Y %H:%M:%S "))
         logging.info(val_metrics)
-        print("\n------------\n")
+        logging.info("End: " + datetime.now().strftime("%m/%d/%Y %H:%M:%S "))
+        logging.info("\n------------\n")
