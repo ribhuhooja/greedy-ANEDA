@@ -66,8 +66,12 @@ def evaluate_model(model, loss_fn, val_loader, device, evaluate_function=None):
             val_losses.append(val_loss)
 
             if evaluate_function:
-                yhat_list.append(yhat)
-                ytrue_list.append(y_val)
+                if device != "cpu":
+                    yhat_list.append(yhat.cpu.numpy())
+                    ytrue_list.append(y_val.cpu.numpy())
+                else:
+                    yhat_list.append(yhat)
+                    ytrue_list.append(y_val)
 
         validation_loss = np.mean(val_losses)
     if evaluate_function:
