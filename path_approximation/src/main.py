@@ -1,8 +1,11 @@
-from datasets_generator import create_train_val_test_sets
-from data_helper import read_yaml
-from utils import make_log_folder, generate_config_list
+import logging
+import os.path
+from datetime import datetime
 
+from data_helper import read_yaml
+from datasets_generator import create_train_val_test_sets
 from train_neural_net import train_neural_net
+from utils import make_log_folder, generate_config_list
 
 if __name__ == '__main__':
     ## Read the config file:
@@ -17,10 +20,11 @@ if __name__ == '__main__':
     dataset = create_train_val_test_sets(data_generator_config)
 
     for i, config in enumerate(config_list):
+        now = datetime.now()
+        logging.basicConfig(filename=os.path.join(config["log_path"], "running_log.log"), level=logging.INFO)
+
         dataset = create_train_val_test_sets(config)
-        train_neural_net(dataset)
+        val_metrics = train_neural_net(dataset)
+        logging.info("run nn on " + config["data"]["file_name"] + " at " + now.strftime("%m/%d/%Y %H:%M:%S "))
+        logging.info(val_metrics)
         print("\n------------\n")
-
-
-
-

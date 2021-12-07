@@ -20,6 +20,8 @@ def _make_train_step(model, loss_fn, optimizer):
         optimizer.zero_grad()
         return loss.item()
 
+    return train_step
+
 
 def _train_model(model, device, loss_fn, optimizer, lr_scheduler, n_epochs, train_loader, val_loader, verbose):
     train_step = _make_train_step(model, loss_fn, optimizer)
@@ -46,7 +48,7 @@ def _train_model(model, device, loss_fn, optimizer, lr_scheduler, n_epochs, trai
             lr_scheduler.step()  # update learning rate after each epoch
     print("Done Training.")
 
-    return train_step
+    return val_metrics
 
 
 def evaluate_model(model, loss_fn, val_loader, device, evaluate_function=None):
@@ -97,8 +99,10 @@ def train_neural_net(dataset):
     model = NeuralNet1(params).to(device)
     epochs = 10
     lr = 0.001
-    optimizer = optim.Adam(model.parameters(), lr=lr)
+    # optimizer = optim.Adam(model.parameters(), lr=lr)
 
+    optimizer = torch.optim.RMSprop(model.parameters(), lr=params['lr'], alpha=0.99, eps=1e-08, weight_decay=0,
+                                    momentum=0, centered=False)
     # loss_fn = nn.MSELoss()
     loss_fn = nn.PoissonNLLLoss(log_input=False, eps=1e-07, reduction='mean')
 
@@ -107,7 +111,5 @@ def train_neural_net(dataset):
                                                      mode=params['lr_sched_mode'], last_epoch=-1,
                                                      gamma=params['gamma'])
     summary(model, input_size=(params['input_size'],))
-    _train_model(model, device, loss_fn, optimizer, lr_scheduler, epochs, train_loader, val_loader, True)
-
-
-predict()
+    val_metrics = _train_model(model, device, loss_fn, optimizer, lr_scheduler, epochs, train_loader, val_loader, True)
+    return val_metrics
