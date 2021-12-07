@@ -3,7 +3,7 @@
 ## For tuning parameters, set `value` as a list (e.g.,  `sample_method: ['random', 'high_degree', 'high_and_low_degree']`)
 random_seed: 42
 data:
-  file_name: small_test #socfb-American75 ## will run with each `file_name` in the list
+  file_name: socfb-American75 ## will run with each `file_name` in the list
   input_path: "../data/{file_name}.edgelist"
   embedding_output_path: "../output/embedding/{file_name}_embed-epochs{epochs}-lr{lr}.pkl"
   landmark_distance_output_path: "../output/landmarks_distance/{file_name}_dist.pkl"
