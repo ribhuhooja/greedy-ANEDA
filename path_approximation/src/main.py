@@ -1,9 +1,7 @@
-from pprint import pprint
-from src.datasets_generator import create_train_val_test_sets
+from datasets_generator import create_train_val_test_sets
 from data_helper import read_yaml
-from testing_functions import run_nn
-from utils import make_log_folder, generate_config_list
-from src.neural_net.train_neural_net import train_neural_net
+from utils import make_log_folder
+from train_neural_net import train_neural_net
 
 if __name__ == '__main__':
     ## Read the config file:

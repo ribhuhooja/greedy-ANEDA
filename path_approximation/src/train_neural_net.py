@@ -4,10 +4,10 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchsummary import summary
 
-from NeuralNet1 import NeuralNet1
-from src.CustomDataset import CustomDataset
-from src.data_helper import *
-from src.evaluations import evaluate_metrics
+from neural_net.NeuralNet1 import NeuralNet1
+from CustomDataset import CustomDataset
+from data_helper import *
+from evaluations import evaluate_metrics
 
 
 def _make_train_step(model, loss_fn, optimizer):

@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.metrics import accuracy_score, mean_absolute_error, mean_absolute_percentage_error, mean_squared_error
 
-from src.metrics import mean_absolute_percentage_error
+from metrics import mean_absolute_percentage_error
 
 
 def evaluate_metrics(y_true, y_pred, print_out, n_rounds=4):

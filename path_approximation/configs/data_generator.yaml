@@ -28,6 +28,6 @@ train_val_test:
   test_size: 0.25
   val_size: 0.15
 log_path: "../output/logs"
-force_recreate_datasets: False
-write_train_val_test: False
+force_recreate_datasets: True
+write_train_val_test: True
 parse_tuning_param_by: ->  ## helpful to create a list of configs
