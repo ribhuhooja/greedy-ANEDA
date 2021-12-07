@@ -1,8 +1,9 @@
 from pprint import pprint
-
+from src.datasets_generator import create_train_val_test_sets
 from data_helper import read_yaml
 from testing_functions import run_nn
 from utils import make_log_folder, generate_config_list
+from src.neural_net.train_neural_net import train_neural_net
 
 if __name__ == '__main__':
     ## Read the config file:
@@ -12,12 +13,8 @@ if __name__ == '__main__':
     make_log_folder(log_folder_name=data_generator_config["log_path"])
 
     ## Make a list of configs, we'll be running the model for each config
-    config_list = generate_config_list(data_generator_config)
+    # config_list = generate_config_list(data_generator_config)
 
-    for i, config in enumerate(config_list):
-        print(f"...running config {i + 1}/{len(config_list)}:")
-        pprint(config)
-        run_nn(config=config)
+    dataset = create_train_val_test_sets(data_generator_config)
 
-    # cmd = "rm -r " + "../output/nn_return/{}".format(graph_name)
-    # os.system(cmd)
+    train_neural_net(dataset)

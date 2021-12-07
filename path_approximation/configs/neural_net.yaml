@@ -1,3 +1,4 @@
+input_size: 128 ## TODO
 batch_size: 500
 hidden_units_1: 200
 hidden_units_2: 100

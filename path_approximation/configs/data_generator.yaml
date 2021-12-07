@@ -3,7 +3,7 @@
 ## For tuning parameters, set `value` as a list (e.g.,  `sample_method: ['random', 'high_degree', 'high_and_low_degree']`)
 random_seed: 42
 data:
-  file_name: ['ego-facebook-original', 'socfb-American75'] ## will run with each `file_name` in the list
+  file_name: socfb-American75 ## will run with each `file_name` in the list
   input_path: "../data/{file_name}.edgelist"
   embedding_output_path: "../output/embedding/{file_name}_embed-epochs{epochs}-lr{lr}.pkl"
   landmark_distance_output_path: "../output/landmarks_distance/{file_name}_dist.pkl"
@@ -16,12 +16,12 @@ node2vec:
   "p": 0.2
   "q": 4
   "num_walks": 25
-  "epochs": 1
+  "epochs": 100
   "batch_size": 128
   "lr": 0.01
 landmark:
-  sample_method: ['random', 'high_degree', 'high_and_low_degree']
-  sample_ratio: [0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08]
+  sample_method: [ 'random', 'high_degree', 'high_and_low_degree' ]
+  sample_ratio: [ 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08 ]
 plot:
   plot_nx_graph: False
 train_val_test:

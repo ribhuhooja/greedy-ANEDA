@@ -27,7 +27,7 @@ def get_test_result(file_name, portion, seed, model):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     data = create_train_val_test_sets(file_name, True, False, portion, "random", seed)
     x, y = tensor(data['x_train'].astype(np.float32)), tensor(
-        data['y_train'].astype(np.float32))  # just for convinience, that's for test not for train
+        data['y_train'].astype(np.float32))  # just for convenience, that's for test not for train
     pred = [model(reshape(input_, (1, input_.size()[0])).to(device)).tolist()[0][0] for input_ in
             x]  # use model to predict
     return accuracy_score(np.round(pred), y), mean_absolute_error(pred, y), mean_squared_error(pred,
