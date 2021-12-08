@@ -31,7 +31,8 @@ def _train_model(model, device, loss_fn, optimizer, lr_scheduler, n_epochs, trai
 
     for epoch in range(n_epochs):
         try:
-            print("lr is: ", lr_scheduler.get_last_lr())
+            print("lr 1 is: ", optimizer.param_groups[0]['lr'])
+            print("lr 2 is: ", lr_scheduler.get_last_lr())
         except:
             print("can not print out learning rate")
 
