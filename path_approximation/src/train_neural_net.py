@@ -30,6 +30,11 @@ def _train_model(model, device, loss_fn, optimizer, lr_scheduler, n_epochs, trai
     validation_losses = []
 
     for epoch in range(n_epochs):
+        try:
+            print("lr is: ", lr_scheduler.get_last_lr())
+        except:
+            print("can not print out learning rate")
+
         batch_losses = []
         for x_batch, y_batch in train_loader:
             x_batch = x_batch.to(device)
@@ -94,15 +99,14 @@ def train_neural_net(dataset):
     train_dataset = CustomDataset(dataset["x_train"], dataset["y_train"])
     val_dataset = CustomDataset(dataset["x_val"], dataset["y_val"])
 
-    train_loader = DataLoader(dataset=train_dataset, batch_size=500)
-    val_loader = DataLoader(dataset=val_dataset, batch_size=500)
-
     params = read_yaml("../configs/neural_net.yaml")
+
+    train_loader = DataLoader(dataset=train_dataset, batch_size=params["batch_size"])
+    val_loader = DataLoader(dataset=val_dataset, batch_size=params["batch_size"])
+
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     model = NeuralNet1(params).to(device)
-    epochs = 10
-    lr = 0.001
     # optimizer = optim.Adam(model.parameters(), lr=lr)
 
     optimizer = torch.optim.RMSprop(model.parameters(), lr=params['lr'], alpha=0.99, eps=1e-08, weight_decay=0,
@@ -115,5 +119,6 @@ def train_neural_net(dataset):
                                                      mode=params['lr_sched_mode'], last_epoch=-1,
                                                      gamma=params['gamma'])
     summary(model, input_size=(params['input_size'],))
-    val_metrics = _train_model(model, device, loss_fn, optimizer, lr_scheduler, epochs, train_loader, val_loader, True)
+    val_metrics = _train_model(model, device, loss_fn, optimizer, lr_scheduler, params["epochs"], train_loader,
+                               val_loader, True)
     return val_metrics
