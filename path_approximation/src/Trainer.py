@@ -46,8 +46,8 @@ class Trainer:
                 print(
                     f"[epoch {epoch + 1}/{n_epochs}] Training loss: {training_loss:.4f};\tValidation loss: {validation_loss:.4f}, Validation metrics: {val_metrics}")
 
-        if lr_scheduler:  # If using learning rate scheduler
-            lr_scheduler.step()  # update learning rate after each epoch
+            if lr_scheduler:  # If using learning rate scheduler
+                lr_scheduler.step()  # update learning rate after each epoch
         print("Done Training.")
 
         return val_metrics
