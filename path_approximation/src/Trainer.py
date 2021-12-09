@@ -92,10 +92,13 @@ class Trainer:
     @staticmethod
     def train_model(neural_net_model: nn.Module, dataset: Dict, params: Dict):
         """
-        train a neural network
-        :param dataset:
+        Train a neural net
+        :param neural_net_model: Neural Net Class
+        :param dataset: a dictionary contains keys=["x_train", "x_val", "y_train", "y_val"] and values are the corresponding datasets
+        :param params: a dictionary contains params for the neural net
         :return:
         """
+        # TODO: lr_finder, early_stopping
 
         train_dataset = CustomDataset(dataset["x_train"], dataset["y_train"])
         val_dataset = CustomDataset(dataset["x_val"], dataset["y_val"])
@@ -115,8 +118,10 @@ class Trainer:
                                                          step_size_up=8 * len(train_dataset), step_size_down=None,
                                                          mode=params['lr_sched_mode'], last_epoch=-1,
                                                          gamma=params['gamma'])
-        summary(model, input_size=(params['input_size'],))
+        summary(model, input_size=(params['input_size'],))  ## print out the model
+
+        # Train the model
         val_metrics = Trainer._train(model, device, loss_fn, optimizer, lr_scheduler, params["epochs"], train_loader,
                                      val_loader, True)
 
-        return val_metrics
+        return val_metrics  # return the last metrics on val set
