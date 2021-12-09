@@ -296,6 +296,8 @@ def run_neural_net(datasets, file_name):
     fig, ax = plt.subplots()
     fig.savefig(im_path)
 
+    print(" --- optimizer.param_groups[0]['lr'] : ", optimizer.param_groups[0]['lr'])
+
     def evaluate(model, dl):
         """
         This function is used to evaluate the model with validation.
@@ -370,6 +372,12 @@ def run_neural_net(datasets, file_name):
         running_loss = 0.0
         stime = time.time()
 
+        try:
+            print("optimizer.param_groups[0]['lr']: ", optimizer.param_groups[0]['lr'])
+            print("lr_sched.get_last_lr(): ", lr_sched.get_last_lr())
+        except:
+            print("can not print out learning rate")
+
         for i, data in enumerate(train_dl, 0):
             iter_count += 1
             # get the inputs; data is a list of [inputs, dist_true]
@@ -393,6 +401,9 @@ def run_neural_net(datasets, file_name):
             writer.add_scalar('monitor/lr-iter', curr_lr, iter_count - 1)
 
             if not isinstance(lr_sched, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                print("if not isinstance(lr_sched, torch.optim.lr_scheduler.ReduceLROnPlateau): ",
+                      lr_sched.get_last_lr())
+
                 lr_sched.step()
 
         val_loss = evaluate(model, val_dl)
