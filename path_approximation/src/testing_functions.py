@@ -13,7 +13,7 @@ import models
 from datasets_generator import create_train_val_test_sets
 
 
-def get_test_result(file_name, portion, seed, model):
+def get_test_result(config, file_name, portion, seed, model):
     """
     test model on random selected pair of nodes from the graph
 
@@ -25,11 +25,18 @@ def get_test_result(file_name, portion, seed, model):
 
     """
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    data = create_train_val_test_sets(file_name, True, False, portion, "random", seed)
+
+    config["landmark"]["sample_ratio"] = portion
+    config["landmark"]["sample_method"] = "random"
+    config["random_seed"] = seed
+    config["data"]["file_name"] = file_name
+
+    data = create_train_val_test_sets(config)
     x, y = tensor(data['x_train'].astype(np.float32)), tensor(
         data['y_train'].astype(np.float32))  # just for convenience, that's for test not for train
-    pred = [model(reshape(input_, (1, input_.size()[0])).to(device)).tolist()[0][0] for input_ in
-            x]  # use model to predict
+    pred = model(x.to(device)).reshape(-1)  # use model to predict
+    y = y.detach().numpy()
+    pred = pred.detach().numpy()
     return accuracy_score(np.round(pred), y), mean_absolute_error(pred, y), mean_squared_error(pred,
                                                                                                y), mean_absolute_percentage_error(
         pred, y)
@@ -70,7 +77,7 @@ def run_nn(config):
     model = models.run_neural_net(datasets, file_name)
     logging.info("run nn on " + file_name + " at " + now.strftime("%m/%d/%Y %H:%M:%S ") + "{}%".format(
         float(portion) * 100) + " " + method)
-    acc, mae, mse, mre = get_test_result(file_name, 0.14, 824,
+    acc, mae, mse, mre = get_test_result(config, file_name, 0.14, 824,
                                          model)  # for small graph, we can have large portion of data to test, but for large graph
     # chose smaller portion to save time
     logging.info("ACC " + str(round(acc, 4) * 100) + "%" + " ||| " + "MAE: " + str(round(mae, 4)))

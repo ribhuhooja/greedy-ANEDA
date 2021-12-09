@@ -1,9 +1,8 @@
 import copy
 import math
 import time
+from evaluations import evaluate_metrics
 
-import matplotlib.pyplot as plt
-import numpy as np
 import torch
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import accuracy_score, mean_absolute_error, mean_absolute_percentage_error, mean_squared_error
@@ -14,6 +13,7 @@ from torchsummary import summary
 
 from data_helper import read_yaml
 from metrics import mean_absolute_percentage_error
+from train_neural_net import evaluate_model
 from utils import *
 
 
@@ -334,11 +334,11 @@ def run_neural_net(datasets, file_name):
     resume_training = False
     start_epoch = 0
     iter_count = 0
-
-    if os.path.exists(checkpoint_path):
-        # raise Exception("this experiment already exists!")
-        print("Already ran training on {}".format(checkpoint_path))
-        return
+    #
+    # if os.path.exists(checkpoint_path):
+    #     # raise Exception("this experiment already exists!")
+    #     print("Already ran training on {}".format(checkpoint_path))
+    #     return
 
     ensure_folders_exist(checkpoint_path)
 
@@ -401,12 +401,21 @@ def run_neural_net(datasets, file_name):
             writer.add_scalar('monitor/lr-iter', curr_lr, iter_count - 1)
 
             if not isinstance(lr_sched, torch.optim.lr_scheduler.ReduceLROnPlateau):
-                print("if not isinstance(lr_sched, torch.optim.lr_scheduler.ReduceLROnPlateau): ",
-                      lr_sched.get_last_lr())
+                # print("if not isinstance(lr_sched, torch.optim.lr_scheduler.ReduceLROnPlateau): ",
+                #       lr_sched.get_last_lr())
 
                 lr_sched.step()
 
         val_loss = evaluate(model, val_dl)
+        print("val_loss: ", val_loss)
+
+        validation_loss, metric_scores = evaluate_model(model, loss_fn, val_dl, device,
+                                                        evaluate_function=evaluate_metrics)
+        print("validation_loss: ", validation_loss)
+        print("metric_scores: ", metric_scores)
+
+        print("=======")
+
         if isinstance(lr_sched, torch.optim.lr_scheduler.ReduceLROnPlateau):
             lr_sched.step(val_loss)
         if val_loss < min_val_loss:

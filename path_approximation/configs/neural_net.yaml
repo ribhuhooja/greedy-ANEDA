@@ -1,5 +1,5 @@
 input_size: 128 ## TODO
-batch_size: 5 ##TODO
+batch_size: 500
 hidden_units_1: 200
 hidden_units_2: 100
 hidden_units_3: 50
@@ -7,7 +7,7 @@ do_1: 0.2
 do_2: 0.1
 do_3: 0.05
 output_size: 1
-lr: 0.0024847800878462483
+lr: 4.3075838258155106e-05
 min_lr: 1.0e-5
 max_lr: 1.0e-3
 epochs: 150

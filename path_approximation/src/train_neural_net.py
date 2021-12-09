@@ -10,11 +10,24 @@ from data_helper import *
 from evaluations import evaluate_metrics
 
 
+def poisson_loss2(y_pred, y_true):
+    """
+    Custom loss function for Poisson model.
+    Equivalent Keras implementation for reference:
+    K.mean(y_pred - y_true * math_ops.log(y_pred + K.epsilon()), axis=-1)
+    For output of shape (2,3) it return (2,) vector. Need to calculate
+    mean of that too.
+    """
+    y_pred = torch.squeeze(y_pred)
+    loss = torch.mean(y_pred - y_true * torch.log(y_pred + 1e-7))
+    return loss
+
+
 def _make_train_step(model, loss_fn, optimizer):
     def train_step(x, y):
         model.train()
         yhat = model(x)
-        loss = loss_fn(y, yhat)
+        loss = loss_fn(yhat, y)
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
@@ -50,7 +63,8 @@ def _train_model(model, device, loss_fn, optimizer, lr_scheduler, n_epochs, trai
         if verbose:
             print(
                 f"[epoch {epoch + 1}/{n_epochs}] Training loss: {training_loss:.4f};\tValidation loss: {validation_loss:.4f}, Validation metrics: {val_metrics}")
-        if lr_scheduler:  # if we use learning rate scheduler
+
+        if lr_scheduler:  # if we use learning rate scheduler # TODO: should updated by each epoch?
             lr_scheduler.step()  # update learning rate after each epoch
     print("Done Training.")
 
@@ -61,6 +75,7 @@ def evaluate_model(model, loss_fn, val_loader, device, evaluate_function=None):
     yhat_list = []
     ytrue_list = []
     val_losses = []
+    metric_scores = None
     with torch.no_grad():
         for x_val, y_val in val_loader:
             x_val = x_val.to(device)
@@ -68,7 +83,7 @@ def evaluate_model(model, loss_fn, val_loader, device, evaluate_function=None):
             model.eval()
             yhat = model(x_val)
 
-            val_loss = loss_fn(y_val, yhat).item()
+            val_loss = loss_fn(yhat, y_val).item()
             val_losses.append(val_loss)
 
             if evaluate_function:
@@ -81,7 +96,8 @@ def evaluate_model(model, loss_fn, val_loader, device, evaluate_function=None):
 
         validation_loss = np.mean(val_losses)
     if evaluate_function:
-        metric_scores = evaluate_function(np.vstack(ytrue_list), np.vstack(yhat_list), print_out=False)
+        metric_scores = evaluate_function(np.vstack(ytrue_list).reshape(-1), np.vstack(yhat_list).reshape(-1),
+                                          print_out=False)
     return validation_loss, metric_scores
 
 
@@ -112,7 +128,10 @@ def train_neural_net(dataset):
 
     optimizer = torch.optim.RMSprop(model.parameters(), lr=params['lr'], alpha=0.99, eps=1e-08, weight_decay=0,
                                     momentum=0, centered=False)
+    print("lr of optimizer: ", optimizer.param_groups[0]['lr'])
+
     # loss_fn = nn.MSELoss()
+    # loss_fn = poisson_loss2  ##
     loss_fn = nn.PoissonNLLLoss(log_input=False, eps=1e-07, reduction='mean')
 
     lr_scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, params['min_lr'], params['max_lr'],
