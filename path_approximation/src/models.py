@@ -10,10 +10,10 @@ from sklearn.preprocessing import StandardScaler
 from torch.utils import data as torch_data
 from torch.utils.tensorboard import SummaryWriter
 from torchsummary import summary
-
+from Trainer import Trainer
 from data_helper import read_yaml
 from metrics import mean_absolute_percentage_error
-from train_neural_net import evaluate_model
+
 from utils import *
 
 
@@ -59,7 +59,7 @@ def run_linear_regression(datasets, use_standard_scaler=False, merge_train_val=T
 def run_neural_net(datasets, file_name):
     ## Refer to https://github.com/kryptokommunist/path-length-approximation-deep-learning/blob/master/src/trainer.py
 
-    params = read_yaml("../configs/neural_net.yaml")
+    params = read_yaml("../configs/neural_net_1.yaml")
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     scores = {}
@@ -409,8 +409,8 @@ def run_neural_net(datasets, file_name):
         val_loss = evaluate(model, val_dl)
         print("val_loss: ", val_loss)
 
-        validation_loss, metric_scores = evaluate_model(model, loss_fn, val_dl, device,
-                                                        evaluate_function=evaluate_metrics)
+        validation_loss, metric_scores = Trainer().evaluate_model(model, loss_fn, val_dl, device,
+                                                                  evaluate_function=evaluate_metrics)
         print("validation_loss: ", validation_loss)
         print("metric_scores: ", metric_scores)
 
