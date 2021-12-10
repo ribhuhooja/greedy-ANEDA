@@ -96,7 +96,7 @@ def create_train_val_test_sets(config, mode):
     x, y = data_helper.remove_data_with_a_few_observations(x, y)
 
     if mode == "train":
-        print("writing train and val sets for training...")
+        print("creating train and val sets for training...")
 
         x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=config["val_size"], random_state=random_seed,
                                                           shuffle=True, stratify=y)
@@ -113,7 +113,7 @@ def create_train_val_test_sets(config, mode):
             print(f'Done writing train and val sets for {config["data"]["file_name"]}')
 
     elif mode == "test":
-        print("writing a test set for testing...")
+        print("creating a test set for testing...")
         datasets = dict()
         datasets["x_test"] = x
         datasets["y_test"] = y
