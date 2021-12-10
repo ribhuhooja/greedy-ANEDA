@@ -1,9 +1,8 @@
 import copy
 import math
 import time
+from evaluations import evaluate_metrics
 
-import matplotlib.pyplot as plt
-import numpy as np
 import torch
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import accuracy_score, mean_absolute_error, mean_absolute_percentage_error, mean_squared_error
@@ -11,9 +10,10 @@ from sklearn.preprocessing import StandardScaler
 from torch.utils import data as torch_data
 from torch.utils.tensorboard import SummaryWriter
 from torchsummary import summary
-
+from Trainer import Trainer
 from data_helper import read_yaml
 from metrics import mean_absolute_percentage_error
+
 from utils import *
 
 
@@ -59,7 +59,7 @@ def run_linear_regression(datasets, use_standard_scaler=False, merge_train_val=T
 def run_neural_net(datasets, file_name):
     ## Refer to https://github.com/kryptokommunist/path-length-approximation-deep-learning/blob/master/src/trainer.py
 
-    params = read_yaml("../configs/neural_net.yaml")
+    params = read_yaml("../configs/neural_net_1.yaml")
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     scores = {}
@@ -296,6 +296,8 @@ def run_neural_net(datasets, file_name):
     fig, ax = plt.subplots()
     fig.savefig(im_path)
 
+    print(" --- optimizer.param_groups[0]['lr'] : ", optimizer.param_groups[0]['lr'])
+
     def evaluate(model, dl):
         """
         This function is used to evaluate the model with validation.
@@ -332,11 +334,11 @@ def run_neural_net(datasets, file_name):
     resume_training = False
     start_epoch = 0
     iter_count = 0
-
-    if os.path.exists(checkpoint_path):
-        # raise Exception("this experiment already exists!")
-        print("Already ran training on {}".format(checkpoint_path))
-        return
+    #
+    # if os.path.exists(checkpoint_path):
+    #     # raise Exception("this experiment already exists!")
+    #     print("Already ran training on {}".format(checkpoint_path))
+    #     return
 
     ensure_folders_exist(checkpoint_path)
 
@@ -370,6 +372,12 @@ def run_neural_net(datasets, file_name):
         running_loss = 0.0
         stime = time.time()
 
+        try:
+            print("optimizer.param_groups[0]['lr']: ", optimizer.param_groups[0]['lr'])
+            print("lr_sched.get_last_lr(): ", lr_sched.get_last_lr())
+        except:
+            print("can not print out learning rate")
+
         for i, data in enumerate(train_dl, 0):
             iter_count += 1
             # get the inputs; data is a list of [inputs, dist_true]
@@ -393,9 +401,21 @@ def run_neural_net(datasets, file_name):
             writer.add_scalar('monitor/lr-iter', curr_lr, iter_count - 1)
 
             if not isinstance(lr_sched, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                # print("if not isinstance(lr_sched, torch.optim.lr_scheduler.ReduceLROnPlateau): ",
+                #       lr_sched.get_last_lr())
+
                 lr_sched.step()
 
         val_loss = evaluate(model, val_dl)
+        print("val_loss: ", val_loss)
+
+        validation_loss, metric_scores = Trainer().evaluate_model(model, loss_fn, val_dl, device,
+                                                                  evaluate_function=evaluate_metrics)
+        print("validation_loss: ", validation_loss)
+        print("metric_scores: ", metric_scores)
+
+        print("=======")
+
         if isinstance(lr_sched, torch.optim.lr_scheduler.ReduceLROnPlateau):
             lr_sched.step(val_loss)
         if val_loss < min_val_loss:

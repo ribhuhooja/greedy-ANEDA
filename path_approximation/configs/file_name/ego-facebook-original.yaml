@@ -1,0 +1,7 @@
+file_name: ego-facebook-original
+test_set_path: "../output/testsets/{file_name}-test_ratio_{test_ratio}.pkl"
+random_seed: 1
+model:
+
+
+
