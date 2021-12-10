@@ -29,6 +29,8 @@ class Trainer:
         training_losses = []
         validation_losses = []
 
+        val_metrics_list = []
+
         for epoch in range(n_epochs):
 
             batch_losses = []
@@ -41,6 +43,7 @@ class Trainer:
             training_losses.append(training_loss)
 
             validation_loss, val_metrics = Trainer.evaluate_model(model, loss_fn, val_loader, device, evaluate_metrics)
+            val_metrics_list.append(val_metrics)
             validation_losses.append(validation_loss)
             if verbose:
                 print(
@@ -50,7 +53,7 @@ class Trainer:
                 lr_scheduler.step()  # update learning rate after each epoch
         print("Done Training.")
 
-        return val_metrics
+        return val_metrics_list
 
     @staticmethod
     def evaluate_model(model, loss_fn, val_loader, device, evaluate_function=None):
@@ -90,12 +93,13 @@ class Trainer:
         return yhat
 
     @staticmethod
-    def train_model(neural_net_model: nn.Module, dataset: Dict, params: Dict):
+    def train_model(neural_net_model: nn.Module, dataset: Dict, params: Dict, test_dataset: Dict = None):
         """
         Train a neural net
         :param neural_net_model: Neural Net Class
         :param dataset: a dictionary contains keys=["x_train", "x_val", "y_train", "y_val"] and values are the corresponding datasets
         :param params: a dictionary contains params for the neural net
+        :param test_dataset: [optional] a dictionary contains keys=["x_test", "y_test"] and values are the corresponding datasets
         :return:
         """
         # TODO: lr_finder, early_stopping
@@ -121,7 +125,15 @@ class Trainer:
         summary(model, input_size=(params['input_size'],))  ## print out the model
 
         # Train the model
-        val_metrics = Trainer._train(model, device, loss_fn, optimizer, lr_scheduler, params["epochs"], train_loader,
-                                     val_loader, True)
+        val_metrics_list = Trainer._train(model, device, loss_fn, optimizer, lr_scheduler, params["epochs"],
+                                          train_loader,
+                                          val_loader, True)
 
-        return val_metrics  # return the last metrics on val set
+        test_metrics = None
+        if test_dataset:
+            test_dataset = CustomDataset(test_dataset["x_test"], test_dataset["y_test"])
+            test_loader = DataLoader(dataset=test_dataset, batch_size=params["batch_size"])
+            test_metrics = Trainer.evaluate_model(model, loss_fn, test_loader, device,
+                                                  evaluate_function=evaluate_metrics)
+
+        return val_metrics_list, test_metrics  # return all the metrics on val set

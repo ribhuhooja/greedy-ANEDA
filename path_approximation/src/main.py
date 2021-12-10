@@ -2,6 +2,7 @@ import logging
 import os.path
 from datetime import datetime
 from testing_functions import run_some_linear_models, run_nn
+from pprint import pformat
 
 from data_helper import read_yaml
 from datasets_generator import create_train_val_test_sets
@@ -22,40 +23,28 @@ if __name__ == '__main__':
 
     for i, config in enumerate(config_list):
         t_start = time.time()
-        logging.basicConfig(filename=os.path.join(config["log_path"], config["data"]["file_name"] + ".log"),
-                            level=logging.INFO)
-        logging.info("Start: " + str(i + 1) + " - " + config["data"]["file_name"] + " at " + datetime.now().strftime(
-            "%m/%d/%Y %H:%M:%S "))
+        date_time = datetime.now()
+        logging.basicConfig(
+            filename=os.path.join(config["log_path"], config["data"]["file_name"] + "_" + str(date_time) + ".log"),
+            level=logging.INFO)
+        logging.info("Start config " + str(i + 1) + " at " + str(datetime.now()))
 
-        dataset = create_train_val_test_sets(config)
+        logging.info(config)
+
+        dataset = create_train_val_test_sets(config, mode="train")
+        test_dataset = create_train_val_test_sets(config, mode="test")
+
+        ## Params for the neural net: TODO: separate model's params
         params_net1 = read_yaml("../configs/neural_net_1.yaml")
 
         ## Train model
-        val_metrics = Trainer.train_model(NeuralNet1, dataset, params_net1)
+        val_metrics_list, test_metrics = Trainer.train_model(NeuralNet1, dataset, params_net1, test_dataset)
 
-        logging.info(val_metrics)
+        ## write log for val_metrics
+        logging.info("val metrics list:\n" + pformat(list(zip(range(1, len(val_metrics_list) + 1), val_metrics_list))))
+        logging.info("loss and metrics on test set:\n" + str(test_metrics))
 
+        ## Measure running time
         t_end = time.time()
-        logging.info(
-            f"End: in {round((t_end - t_start) / 60, 2)} mins, - " + str(
-                i + 1) + "th config - " + datetime.now().strftime(
-                "%m/%d/%Y %H:%M:%S "))
+        logging.info(f"End config {i + 1} in {round((t_end - t_start) / 60, 2)} mins, at " + str(datetime.now()))
         logging.info("\n------------\n")
-
-    #### Old code
-    # ## Read the config file:
-    # data_generator_config = read_yaml("../configs/data_generator.yaml")
-    #
-    # ## Make a log folder to log the experiments
-    # make_log_folder(log_folder_name=data_generator_config["log_path"])
-    #
-    # ## Make a list of configs, we'll be running the model for each config
-    # config_list = generate_config_list(data_generator_config)
-    #
-    # for i, config in enumerate(config_list):
-    #     print(f"...running config {i + 1}/{len(config_list)}:")
-    #     print(config)
-    #     run_nn(config=config)
-    #
-    # # cmd = "rm -r " + "../output/nn_return/{}".format(graph_name)
-    # # os.system(cmd)
