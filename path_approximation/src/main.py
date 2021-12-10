@@ -31,8 +31,8 @@ if __name__ == '__main__':
 
         logging.info(config)
 
-        dataset = create_train_val_test_sets(config, mode="train")
-        test_dataset = create_train_val_test_sets(config, mode="test")
+        dataset = create_train_val_test_sets(config, mode="train")  # for training
+        test_dataset = create_train_val_test_sets(config, mode="test")  # for testing
 
         ## Params for the neural net: TODO: separate model's params
         params_net1 = read_yaml("../configs/neural_net_1.yaml")

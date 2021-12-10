@@ -100,7 +100,7 @@ class Trainer:
         :param dataset: a dictionary contains keys=["x_train", "x_val", "y_train", "y_val"] and values are the corresponding datasets
         :param params: a dictionary contains params for the neural net
         :param test_dataset: [optional] a dictionary contains keys=["x_test", "y_test"] and values are the corresponding datasets
-        :return:
+        :return:  val and test metrics
         """
         # TODO: lr_finder, early_stopping
 
@@ -136,4 +136,4 @@ class Trainer:
             test_metrics = Trainer.evaluate_model(model, loss_fn, test_loader, device,
                                                   evaluate_function=evaluate_metrics)
 
-        return val_metrics_list, test_metrics  # return all the metrics on val set
+        return val_metrics_list, test_metrics  # return all the metrics on val set and the metrics for test set
