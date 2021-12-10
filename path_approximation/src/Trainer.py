@@ -128,7 +128,6 @@ class Trainer:
         val_metrics_list = Trainer._train(model, device, loss_fn, optimizer, lr_scheduler, params["epochs"],
                                           train_loader,
                                           val_loader, True)
-
         test_metrics = None
         if test_dataset:
             test_dataset = CustomDataset(test_dataset["x_test"], test_dataset["y_test"])

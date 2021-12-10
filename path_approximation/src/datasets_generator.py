@@ -18,13 +18,19 @@ def create_train_val_test_sets(config, mode):
         final_output_path = config["data"]["final_train_val_sets_path"].format(file_name=file_name,
                                                                                sample_ratio_for_training=
                                                                                config["landmark"][
-                                                                                   "sample_ratio_for_training"])
+                                                                                   "sample_ratio_for_training"],
+                                                                               sample_method=config["landmark"][
+                                                                                   "sample_method"],
+                                                                               val_size=config["val_size"])
         force_recreate = config["force_recreate_train_and_val_sets"]
 
     elif mode == "test":
         final_output_path = config["data"]["final_test_set_path"].format(file_name=file_name,
                                                                          sample_ratio_for_testing=config["landmark"][
-                                                                             "sample_ratio_for_testing"])
+                                                                             "sample_ratio_for_testing"],
+                                                                         sample_method=config["landmark"][
+                                                                             "sample_method"],
+                                                                         )
         force_recreate = config["force_recreate_test_set"]
     else:
         raise ValueError()

@@ -3,12 +3,12 @@
 ## For tuning parameters, set `value` as a list (e.g.,  `sample_method: ['random', 'high_degree', 'high_and_low_degree']`)
 random_seed: 42
 data:
-  file_name: fb-pages-food  #fb-pages-food #socfb-American75
+  file_name: small_test #fb-pages-food #socfb-American75
   input_path: "../data/{file_name}.edgelist"
   embedding_output_path: "../output/embedding/{file_name}_embed-epochs{epochs}-lr{lr}.pkl"
   landmark_distance_output_path: "../output/landmarks_distance/{file_name}_dist.pkl"
-  final_train_val_sets_path: "../output/datasets/{file_name}_train_val_sets-ratio-{sample_ratio_for_training}.pkl"
-  final_test_set_path: "../output/datasets/{file_name}_test_set-ratio-{sample_ratio_for_testing}.pkl"
+  final_train_val_sets_path: "../output/datasets/{file_name}_train_val_sets-landmark_ratio-{sample_ratio_for_training}-sample_method-{sample_method}-val_size-{val_size}.pkl"
+  final_test_set_path: "../output/datasets/{file_name}_test_set-landmark_ratio-{sample_ratio_for_testing}-sample_method-{sample_method}.pkl"
 
 node2vec:
   "device": cuda
@@ -23,8 +23,8 @@ node2vec:
   "lr": 0.01
 landmark:
   sample_method: high_degree  #[ 'random'  , 'high_degree' ]  #, 'high_and_low_degree' ]
-  sample_ratio_for_training: [ 0.2, 0.2, 0.2, 0.2, 0.2 ]
-  sample_ratio_for_testing: 0.7 ##  use 0.7  (70%) nodes as landmarks, then get all distance pairs from these landmarks to create labels.
+  sample_ratio_for_training: 0.3
+  sample_ratio_for_testing: 0.7 ## use 0.7  (70%) nodes as landmarks, then get all distance pairs from these landmarks to create labels.
 plot:
   plot_nx_graph: False
 val_size: 0.2 # val/train = 0.2:0.8, for training

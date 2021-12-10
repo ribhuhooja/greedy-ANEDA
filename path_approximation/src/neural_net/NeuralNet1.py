@@ -6,6 +6,13 @@ class NeuralNet1(nn.Module):
     '''
         A Simple Neural Net Model
 
+        https://github.com/keras-team/keras/issues/1802
+        http://torch.ch/blog/2016/02/04/resnets.html
+        https://stackoverflow.com/questions/39691902/ordering-of-batch-normalization-and-dropout
+                CONV/FC -> ReLu(or other activation) -> Dropout -> BatchNorm -> CONV/FC
+
+        """
+
     '''
 
     def __init__(self, params):
@@ -34,5 +41,3 @@ class NeuralNet1(nn.Module):
     def forward(self, x):
         '''Forward pass'''
         return self.layers(x)
-
-
