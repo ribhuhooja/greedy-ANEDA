@@ -2,7 +2,7 @@ import logging
 import os.path
 from datetime import datetime
 from testing_functions import run_some_linear_models, run_nn
-from pprint import pformat
+from pprint import pformat, pprint
 
 from data_helper import read_yaml
 from datasets_generator import create_train_val_test_sets
@@ -20,7 +20,8 @@ if __name__ == '__main__':
 
     # Make a list of configs, we'll be running the model for each config
     config_list = generate_config_list(data_generator_config)
-    ## the config in config_list are all the same, so we can't get different conbination
+    # resolved! Fix a small bug. Can now use the `config_list`.
+    
     ## here just for the program to run 
     config = config_list[0]
     real_train = [0.2,0.3,0.4,0.5,0.6,0.7]

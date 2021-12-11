@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 from sklearn.model_selection import ParameterGrid
+import copy
 
 
 def make_log_folder(log_folder_name="logs"):
@@ -90,12 +91,14 @@ def generate_config_list(config: Dict) -> List[Dict]:
                 config[key_list[0]] = param_v
             else:
                 config[key_list[0]][key_list[1]] = param_v
+        print(id(config))
         return config
 
     tuning_params = get_tuning_params(config)
     tuning_params_grid = ParameterGrid(tuning_params)
     config_list = []
     for i, params in enumerate(tuning_params_grid):
-        config_list.append(update_dict(config, params))
+        new_config = update_dict(copy.deepcopy(config), params)
+        config_list.append(new_config)
     print(f"Create {len(config_list)} different configs!")
     return config_list
