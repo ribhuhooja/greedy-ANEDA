@@ -26,6 +26,35 @@ def get_landmark_custom2(g: nx.Graph, portion):
     landmark_nodes_low = [node[0] for node in s[-int(len(s) * (portion / 2)):]]
     return landmark_nodes_high + landmark_nodes_low
 
+def get_landmark_custom3(g: nx.Graph, portion, centrality_type):
+    """
+    picks those nodes according to Centrality
+    """
+    g1 = nx.Graph(g)
+    if(centrality_type == 'betweenness_centrality'):
+        centrality = nx.betweenness_centrality(g1)
+    elif(centrality_type == 'communicability_betweenness_centrality'):
+        centrality = nx.betweenness_centrality(g1)
+    elif(centrality_type == 'closeness_centrality'):
+        centrality = nx.closeness_centrality(g1)
+    else:
+        raise ValueError(
+            "can't recogonize the input centrality_type, the current available are [betweenness_centrality,communicability_betweenness_centrality,closeness_centrality']")
+   
+    centrality = [(x,centrality[x]) for x in centrality]
+    s = sorted(centrality, key=lambda x: x[1], reverse=True)
+    landmark_nodes = [node[0] for node in s[:int(len(s) * portion)]]
+    return landmark_nodes
+
+def get_landmark_custom4(g: nx.Graph, portion):
+    """
+    picks those nodds with medium degree
+    """
+    cut_position = (1-portion)/2
+    ## sort node according to degrees
+    s = sorted(g.degree, key=lambda x: x[1], reverse=True)
+    landmark_nodes = [node[0] for node in s[int(len(s) * cut_position):-int(len(s) * cut_position)]]
+    return landmark_nodes
 
 def get_landmark_nodes(num_landmarks: int, graph: nx.Graph, random_seed: int = None) -> List:
     """

@@ -22,8 +22,8 @@ node2vec:
   "batch_size": 128
   "lr": 0.01
 landmark:
-  sample_method: high_degree  #[ 'random'  , 'high_degree' ]  #, 'high_and_low_degree' ]
-  sample_ratio_for_training: 0.3
+  sample_method: [high_degree,random]  #[ 'random'  , 'high_degree' ]  #, 'high_and_low_degree' ]
+  sample_ratio_for_training: [0.2,0.3,0.4,0.5,0.6,0.7]
   sample_ratio_for_testing: 0.7 ## use 0.7  (70%) nodes as landmarks, then get all distance pairs from these landmarks to create labels.
 plot:
   plot_nx_graph: False

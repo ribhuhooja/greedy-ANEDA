@@ -80,6 +80,12 @@ def create_train_val_test_sets(config, mode):
         landmark_nodes = landmarks.get_landmark_custom(nx_graph, portion=sample_ratio)
     elif sample_method == "high_and_low_degree":
         landmark_nodes = landmarks.get_landmark_custom2(nx_graph, portion=sample_ratio)
+    elif 'centrality' in sample_method:
+        landmark_nodes = landmarks.get_landmark_custom3(nx_graph, portion=sample_ratio,
+                                                       centrality_type = sample_method )
+    elif sample_method == 'medium_degree':
+        landmark_nodes = landmarks.get_landmark_custom4(nx_graph, portion=sample_ratio)
+        
     else:
         raise ValueError(
             f"landmark sampling method should be in [random, high_degree, high_and_low_degree], instead of {sample_method}!")

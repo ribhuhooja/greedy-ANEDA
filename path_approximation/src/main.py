@@ -20,8 +20,15 @@ if __name__ == '__main__':
 
     # Make a list of configs, we'll be running the model for each config
     config_list = generate_config_list(data_generator_config)
-
-    for i, config in enumerate(config_list):
+    ## the config in config_list are all the same, so we can't get different conbination
+    ## here just for the program to run 
+    config = config_list[0]
+    real_train = [0.2,0.3,0.4,0.5,0.6,0.7]
+    real_method = ['betweenness_centrality', 'closeness_centrality','random','high_degree','medium_degree']
+    for i in (range(len(real_train) * len(real_method))):
+        #config['landmark']['sample_ratio_for_training']
+        config['landmark']['sample_ratio_for_training'] = real_train[i%len(real_train)]
+        config['landmark']['sample_method'] = real_method[i//len(real_train)]
         t_start = time.time()
         date_time = datetime.now()
         logging.basicConfig(
@@ -29,7 +36,7 @@ if __name__ == '__main__':
             level=logging.INFO)
         logging.info("Start config " + str(i + 1) + " at " + str(datetime.now()))
 
-        logging.info(config)
+        #logging.info(config)
 
         dataset = create_train_val_test_sets(config, mode="train")  # for training
         test_dataset = create_train_val_test_sets(config, mode="test")  # for testing
@@ -41,7 +48,9 @@ if __name__ == '__main__':
         val_metrics_list, test_metrics = Trainer.train_model(NeuralNet1, dataset, params_net1, test_dataset)
 
         ## write log for val_metrics
-        logging.info("val metrics list:\n" + pformat(list(zip(range(1, len(val_metrics_list) + 1), val_metrics_list))))
+        
+        #logging.info("val metrics list:\n" + pformat(list(zip(range(1, len(val_metrics_list) + 1), val_metrics_list))))
+        logging.info(config['landmark'])
         logging.info("loss and metrics on test set:\n" + str(test_metrics))
 
         ## Measure running time
