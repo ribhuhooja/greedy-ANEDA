@@ -4,12 +4,13 @@ from datetime import datetime
 from testing_functions import run_routing
 from pprint import pformat, pprint
 
-from data_helper import read_yaml
+from data_helper import read_yaml, read_file
 from datasets_generator import create_train_val_test_sets
 from Trainer import Trainer
 from utils import make_log_folder, generate_config_list
 import time
 from neural_net.NeuralNet1 import NeuralNet1
+import numpy as np
 
 if __name__ == '__main__':
     ##### Here is a sample flow to run the project
@@ -67,6 +68,10 @@ if __name__ == '__main__':
         model, val_metrics_list, test_metrics = Trainer.maybe_train_model(NeuralNet1, train_dataset, params_net1,
                                                                           test_dataset=test_dataset,
                                                                           model_name=model_name)
+
+        ##### Use model to approximate the distance (for demo purpose)
+        emb_of_2_nodes = np.float32(np.random.rand(3, 128))
+        print("Predict: ", Trainer.predict(model, emb_of_2_nodes))
 
         ## log metrics for val, test sets
         # logging.info("val metrics list:\n" + pformat(list(zip(range(1, len(val_metrics_list) + 1), val_metrics_list))))

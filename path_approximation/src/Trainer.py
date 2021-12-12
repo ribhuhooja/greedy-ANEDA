@@ -1,11 +1,13 @@
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchsummary import summary
-
+from typing import Union
 from CustomDataset import CustomDataset
 from data_helper import *
 from evaluations import evaluate_metrics
+from utils import is_numpy_array
 
 
 class Trainer:
@@ -76,8 +78,8 @@ class Trainer:
                         yhat_list.append(yhat.cpu().numpy())
                         ytrue_list.append(y_val.cpu().numpy())
                     else:
-                        yhat_list.append(yhat)
-                        ytrue_list.append(y_val)
+                        yhat_list.append(yhat.numpy())
+                        ytrue_list.append(y_val.numpy())
 
             validation_loss = np.mean(val_losses)
         if evaluate_function:
@@ -86,11 +88,25 @@ class Trainer:
         return validation_loss, metric_scores
 
     @staticmethod
-    def predict(model, x):
-        ## TODO
+    def predict(model: nn.Module, x: Union[np.array, torch.Tensor]) -> np.array:
+        """
+        return predictions
+        :param model:  neural net model
+        :param x:  embedding of 2 nodes. x should be the average embedding of 2 nodes. See `data_helper.py` -> `create_dataset()` for more detail.
+        :return: distance of the 2 nodes
+        """
+        if is_numpy_array(x):
+            x = torch.tensor(x)
+
+        device = next(model.parameters()).device
         model.eval()
-        yhat = model(x)
-        return yhat
+        with torch.no_grad():
+            yhat = model(x.to(device))
+
+        if device != "cpu":
+            return yhat.reshape(-1).cpu().numpy()
+        else:
+            return yhat.reshape(-1).numpy()
 
     @staticmethod
     def save_model(model, path, model_name):

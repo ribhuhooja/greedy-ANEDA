@@ -102,3 +102,12 @@ def generate_config_list(config: Dict) -> List[Dict]:
         config_list.append(new_config)
     print(f"Create {len(config_list)} different configs!")
     return config_list
+
+
+def is_numpy_array(arr):
+    """
+    check if an array is a Numpy array, return True if so, False otherwise
+    :param arr:
+    :return:
+    """
+    return type(arr).__module__ == np.__name__

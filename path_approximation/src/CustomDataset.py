@@ -4,14 +4,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-
-def is_numpy_array(arr):
-    """
-    check if an array is a Numpy array, return True if so, False otherwise
-    :param arr:
-    :return:
-    """
-    return type(arr).__module__ == np.__name__
+from utils import is_numpy_array
 
 
 class CustomDataset(Dataset):
