@@ -21,12 +21,13 @@
 - [Source Code from Sarel](https://github.com/kryptokommunist/path-length-approximation-deep-learning)
 - [New Source Code (this repo)](https://github.com/BU-Lisp/dl-hyperbolic-random-graphs/tree/main/path_approximation)
     + Quick start:
-      Modify config files in `configs` folder, then:
+      Modify the 2 config files in `configs` folder, then:
       ```
       pip install -r requirements.txt
       cd src
       python main.py
       ```
+      `main.py` contains the follow step by step.
     + Current ideas:
       Similar to the 2018 paper, modify step 3 and 4:
 
@@ -41,6 +42,7 @@
 - [x] Create datasets
 - [x] Linear model
 - [x] Neural Net
+- [x] Add routing code
 - [ ] More experiments
     - [ ] [Graphs](https://networkrepository.com): Different types of graphs (e.g., road networks, internet graphs),
       different sizes (small vs. large graphs)
