@@ -144,8 +144,8 @@ def create_train_val_test_sets(config, mode):
 def create_node_test_pairs(graph, config):
     # Sample source nodes
     random_seed = config["random_seed"]
-    sample_method = config["landmark"]["sample_method"]
-    sample_ratio = config["landmark"]["sample_ratio_for_training"]
+    sample_method = config["routing"]["sample_method"]
+    sample_ratio = config["routing"]["sample_ratio"]
     if sample_method == 'random':
         num_landmarks = int(len(graph) * sample_ratio)
         landmark_nodes = landmarks.get_landmark_nodes(num_landmarks, graph, random_seed=random_seed)

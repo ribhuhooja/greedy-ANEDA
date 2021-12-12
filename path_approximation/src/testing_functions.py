@@ -155,7 +155,7 @@ def run_linear_model_with_under_and_over_sampling(file_name, force_recreate_data
     return True
 
 
-def run_routing(config, num_random_indices=1000):
+def run_routing(config):
     """
     Run routing algorithm on given graph with given heuristic and landmark method
     :param config: provide all we need in terms of parameters
@@ -186,7 +186,7 @@ def run_routing(config, num_random_indices=1000):
     gr = GraphRouter(graph=nx_graph)
     curr_time = datetime.now()
     print(len(pairs))
-    indices = np.random.choice(range(len(pairs)), num_random_indices, replace=False)
+    indices = np.random.choice(range(len(pairs)), config["routing"]["num_samples"], replace=False)
     for idx, i in enumerate(indices):
         if idx % 50 == 0:
             print(idx)

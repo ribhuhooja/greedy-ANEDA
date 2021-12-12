@@ -34,7 +34,7 @@ if __name__ == '__main__':
         t_start = time.time()
         date_time = datetime.now()
         logging.basicConfig(
-            filename=os.path.join(config["log_path"], config["data"]["file_name"] + "_" + str(date_time) + ".log"),
+            filename=os.path.join(config["log_path"], config["data"]["file_name"] + "_{}.log".format(datetime.strftime(date_time, '%Y%m%d%H%M%S_%f'))),
             level=logging.INFO)
         logging.info("Start config " + str(i + 1) + " at " + str(datetime.now()))
 
@@ -81,4 +81,4 @@ if __name__ == '__main__':
         ##########
         ### Test to see if the routing code can run
         print("----------")
-        run_routing(config=config, num_random_indices=10)
+        run_routing(config=config)

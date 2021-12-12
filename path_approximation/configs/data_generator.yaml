@@ -24,10 +24,14 @@ landmark:
   sample_method: high_degree #[ high_degree, random ]  # valid methods: ['betweenness_centrality', 'closeness_centrality','random','high_degree','medium_degree']
   sample_ratio_for_training: 0.5 #[ 0.2,0.3,0.4,0.5,0.6,0.7 ]
   sample_ratio_for_testing: 0.7 ## use 0.7  (70%) nodes as landmarks, then get all distance pairs from these landmarks to create labels.
+routing:
+  sample_method: random
+  sample_ratio: 0.5
+  num_samples: 1000
 plot:
   plot_nx_graph: False
 val_size: 0.2 # val/train = 20% / 80%, for training
-log_path: "../output/logs"
+log_path: "..\\output\\logs"
 force_recreate_train_and_val_sets: True
 force_recreate_test_set: True
 write_train_val_sets: True
