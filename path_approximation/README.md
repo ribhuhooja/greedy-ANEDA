@@ -27,7 +27,7 @@
       cd src
       python main.py
       ```
-      `main.py` contains the follow step by step.
+      `main.py` contains the flow step by step.
     + Current ideas:
       Similar to the 2018 paper, modify step 3 and 4:
 

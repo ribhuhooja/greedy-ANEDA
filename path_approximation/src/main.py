@@ -12,11 +12,11 @@ import time
 from neural_net.NeuralNet1 import NeuralNet1
 
 if __name__ == '__main__':
-    ##### Here is a sample follow to run the project
+    ##### Here is a sample flow to run the project
     ## Firstly, change the config files in "/configs"
-    ##      + data_generator.yaml: edit `file_name` to choose the input file. Pick small dataset to start first. The rest can be the same
+    ##      + data_generator.yaml: edit `file_name` to choose the input file. Pick small dataset to start first. The rest of params can be left the same
     ##      + neural_net_1.yaml: Params for neural net model
-    ## Then, follow each steps
+    ## Then, follow each of below steps
 
     ## Read the config file:
     data_generator_config = read_yaml("../configs/data_generator.yaml")
@@ -63,7 +63,7 @@ if __name__ == '__main__':
         # ## Sanity check
         # assert Trainer.compare_2_models(model, new_model), "The 2 models are different!"
 
-        ## We can also call Trainer
+        ## We can also call Trainer.maybe_train_model:
         model, val_metrics_list, test_metrics = Trainer.maybe_train_model(NeuralNet1, train_dataset, params_net1,
                                                                           test_dataset=test_dataset,
                                                                           model_name=model_name)
