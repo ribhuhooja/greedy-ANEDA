@@ -8,9 +8,12 @@ from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
 from sklearn.metrics import accuracy_score, mean_absolute_error, mean_squared_error, mean_absolute_percentage_error
 from torch import tensor, reshape
-
+from data_helper import load_edgelist_file_to_dgl_graph
 import models
-from datasets_generator import create_train_val_test_sets
+from datasets_generator import create_train_val_test_sets, create_node_test_pairs
+import dgl
+
+from routing import GraphRouter
 
 
 def get_test_result(config, file_name, portion, seed, model):
@@ -150,3 +153,47 @@ def run_linear_model_with_under_and_over_sampling(file_name, force_recreate_data
     logging.info(scores)
 
     return True
+
+
+def run_routing(config, num_random_indices=1000):
+    """
+    Run routing algorithm on given graph with given heuristic and landmark method
+    :param config: provide all we need in terms of parameters
+    :return: ?
+    """
+    now = datetime.now()
+
+    # logging.basicConfig(filename=os.path.join(config["log_path"], f"routing_{str(now)}.log"), level=logging.INFO)
+    file_name = config["data"]["file_name"]
+
+    ##### Step 1. Read data
+    ## Load input file into a DGL graph
+    ## convert the `dgl` graph to `networkx` graph. We will use networkx for finding the shortest path
+    input_path = config["data"]["input_path"].format(file_name=file_name)
+    graph = load_edgelist_file_to_dgl_graph(path=input_path, undirected=True,
+                                            edge_weights=None)
+
+    nx_graph = dgl.to_networkx(graph)
+    print(nx_graph.number_of_nodes())
+    print(nx_graph.number_of_edges())
+
+    #####  Step 2: Generate test pairs
+    ## Sample landmarks, and generate a source dest pair (l, n) for every landmark l and node n
+    pairs = create_node_test_pairs(nx_graph, config)
+
+    ##### Step 3: Djikstra's
+    ## Run Dijkstra's with each pair for baseline time
+    gr = GraphRouter(graph=nx_graph)
+    curr_time = datetime.now()
+    print(len(pairs))
+    indices = np.random.choice(range(len(pairs)), num_random_indices, replace=False)
+    for idx, i in enumerate(indices):
+        if idx % 50 == 0:
+            print(idx)
+        u, v = pairs[i]
+        # print(u, v)
+        _ = gr.dijkstra(u, v)
+    print(datetime.now() - curr_time)
+
+    # Generate or load embeddings and distance measure. Generate heuristic function
+    # Run A* with each pair and heuristic for test time

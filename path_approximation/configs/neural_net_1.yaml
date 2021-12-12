@@ -14,3 +14,4 @@ epochs: 150
 lr_sched: clr
 lr_sched_mode: triangular
 gamma: 0.95
+save_path: "../output/models/NeuralNet1{model_name}.model"

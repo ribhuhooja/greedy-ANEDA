@@ -8,6 +8,7 @@ import landmarks
 import node2vec
 from data_helper import read_file
 from utils import plot_nx_graph
+import networkx as nx
 
 
 def create_train_val_test_sets(config, mode):
@@ -82,13 +83,13 @@ def create_train_val_test_sets(config, mode):
         landmark_nodes = landmarks.get_landmark_custom2(nx_graph, portion=sample_ratio)
     elif 'centrality' in sample_method:
         landmark_nodes = landmarks.get_landmark_custom3(nx_graph, portion=sample_ratio,
-                                                       centrality_type = sample_method )
+                                                        centrality_type=sample_method)
     elif sample_method == 'medium_degree':
         landmark_nodes = landmarks.get_landmark_custom4(nx_graph, portion=sample_ratio)
-        
+
     else:
         raise ValueError(
-            f"landmark sampling method should be in [random, high_degree, high_and_low_degree], instead of {sample_method}!")
+            f"landmark sampling method should be in ['betweenness_centrality', 'closeness_centrality','random','high_degree','medium_degree'], instead of {sample_method}!")
 
     # TODO: when all nodes are landmark nodes, might need a better way to calc the distance (symmetric matrix)
 
@@ -138,3 +139,31 @@ def create_train_val_test_sets(config, mode):
         raise ValueError("mode should be 'train' or 'test'!")
 
     return datasets
+
+
+def create_node_test_pairs(graph, config):
+    # Sample source nodes
+    random_seed = config["random_seed"]
+    sample_method = config["landmark"]["sample_method"]
+    sample_ratio = config["landmark"]["sample_ratio_for_training"]
+    if sample_method == 'random':
+        num_landmarks = int(len(graph) * sample_ratio)
+        landmark_nodes = landmarks.get_landmark_nodes(num_landmarks, graph, random_seed=random_seed)
+    elif sample_method == 'high_degree':
+        landmark_nodes = landmarks.get_landmark_custom(graph, portion=sample_ratio)
+    elif sample_method == "high_and_low_degree":
+        landmark_nodes = landmarks.get_landmark_custom2(graph, portion=sample_ratio)
+    elif 'centrality' in sample_method:
+        landmark_nodes = landmarks.get_landmark_custom3(graph, portion=sample_ratio, centrality_type=sample_method)
+    elif sample_method == 'medium_degree':
+        landmark_nodes = landmarks.get_landmark_custom4(graph, portion=sample_ratio)
+    else:
+        raise ValueError(
+            f"landmark sampling method should be in ['betweenness_centrality', 'closeness_centrality','random','high_degree','medium_degree'], instead of {sample_method}!")
+    pairs = []
+    # Generate source, dest pairs
+    for landmark in landmark_nodes:
+        node_dists = nx.shortest_path_length(G=graph, source=landmark)
+        for node, _ in node_dists.items():
+            pairs.append((landmark, node))
+    return pairs
