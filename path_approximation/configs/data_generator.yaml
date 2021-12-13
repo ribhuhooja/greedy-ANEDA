@@ -3,7 +3,7 @@
 ## For tuning parameters, set `value` as a list (e.g.,  if we set `sample_method: ['random', 'high_degree', 'high_and_low_degree']`, we will generate 3 different configs)
 random_seed: 42
 data:
-  file_name: small_test # "small_test" is a small network file for testing. Other data are in "/data" folder, should start off with a small dataset.
+  file_name: fb-pages-food # small_test # "small_test" is a small network file for testing. Other data are in "/data" folder, should start off with a small dataset.
   input_path: "../data/{file_name}.edgelist"
   embedding_output_path: "../output/embedding/{file_name}_embed-epochs{epochs}-lr{lr}.pkl"
   landmark_distance_output_path: "../output/landmarks_distance/{file_name}_dist.pkl"

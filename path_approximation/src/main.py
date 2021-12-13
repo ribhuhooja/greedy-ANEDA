@@ -86,4 +86,4 @@ if __name__ == '__main__':
         ##########
         ### Test to see if the routing code can run
         print("----------")
-        run_routing(config=config)
+        run_routing(config, model)

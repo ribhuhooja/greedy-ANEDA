@@ -8,12 +8,13 @@ from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
 from sklearn.metrics import accuracy_score, mean_absolute_error, mean_squared_error, mean_absolute_percentage_error
 from torch import tensor, reshape
-from data_helper import load_edgelist_file_to_dgl_graph
+from data_helper import load_edgelist_file_to_dgl_graph, read_file
 import models
 from datasets_generator import create_train_val_test_sets, create_node_test_pairs
 import dgl
 
 from routing import GraphRouter
+from Trainer import Trainer
 
 
 def get_test_result(config, file_name, portion, seed, model):
@@ -155,7 +156,7 @@ def run_linear_model_with_under_and_over_sampling(file_name, force_recreate_data
     return True
 
 
-def run_routing(config):
+def run_routing(config, model):
     """
     Run routing algorithm on given graph with given heuristic and landmark method
     :param config: provide all we need in terms of parameters
@@ -184,16 +185,37 @@ def run_routing(config):
     ##### Step 3: Djikstra's
     ## Run Dijkstra's with each pair for baseline time
     gr = GraphRouter(graph=nx_graph)
-    curr_time = datetime.now()
     print(len(pairs))
     indices = np.random.choice(range(len(pairs)), config["routing"]["num_samples"], replace=False)
+    curr_time = datetime.now()
     for idx, i in enumerate(indices):
-        if idx % 50 == 0:
+        if idx % 100 == 0:
             print(idx)
         u, v = pairs[i]
         # print(u, v)
-        _ = gr.dijkstra(u, v)
+        _ = gr.astar(u, v)
     print(datetime.now() - curr_time)
 
-    # Generate or load embeddings and distance measure. Generate heuristic function
+
+    # Load embeddings and distance measure. Generate heuristic function
+    file_name = config["data"]["file_name"]
+    node2vec_args = config["node2vec"]
+    embedding_output_path = config["data"]["embedding_output_path"].format(file_name=file_name,
+                                                                           epochs=node2vec_args["epochs"],
+                                                                           lr=node2vec_args["lr"])
+    embedding = read_file(embedding_output_path)
+
+    # gr.heuristic = lambda x, y: 10
+    gr.heuristic = lambda x, y: Trainer.predict(model, np.array((embedding[x] + embedding[y]) / 2.0).reshape(1,-1))[0]
+
+    # predict(model: nn.Module, x: Union[np.array, torch.Tensor])
+
     # Run A* with each pair and heuristic for test time
+    curr_time = datetime.now()
+    for idx, i in enumerate(indices):
+        if idx % 100 == 0:
+            print(idx)
+        u, v = pairs[i]
+        # print(u, v)
+        _ = gr.astar(u, v)
+    print(datetime.now() - curr_time)

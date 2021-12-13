@@ -178,7 +178,9 @@ class GraphRouter():
                     if qcost <= ncost:
                         continue
                 else:
-                    h = self.heuristic(neighbor, target)
+                    h = self.get_dist(neighbor, target)
+                    # h = self.heuristic(neighbor, target)
+                    # print("       " + str(h))
                 enqueued[neighbor] = ncost, h
                 push(queue, (ncost + h, next(c), neighbor, ncost, curnode))
 
