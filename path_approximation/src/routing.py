@@ -18,6 +18,7 @@ class GraphRouter():
         else:
             dist = self.heuristic(u, v)
             self.distances[pair_key] = dist
+        # print("Dist: {}".format(dist))
         return dist
 
     # Modified from https://networkx.org/documentation/stable/_modules/networkx/algorithms/shortest_paths/weighted.html#dijkstra_path
@@ -134,6 +135,7 @@ class GraphRouter():
         # priority and is guaranteed unique for all nodes in the graph.
         c = count()
         queue = [(0, next(c), source, 0, None)]
+        num_visited = 0
 
         # Maps enqueued nodes to distance of discovered paths and the
         # computed heuristics to target. We avoid computing the heuristics
@@ -145,6 +147,7 @@ class GraphRouter():
         while queue:
             # Pop the smallest item from queue.
             _, __, curnode, dist, parent = pop(queue)
+            num_visited += 1
 
             if curnode == target:
                 path = [curnode]
@@ -153,7 +156,7 @@ class GraphRouter():
                     path.append(node)
                     node = explored[node]
                 path.reverse()
-                return path
+                return path, num_visited
 
             if curnode in explored:
                 # Do not override the parent of starting node

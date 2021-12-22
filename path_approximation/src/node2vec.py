@@ -42,10 +42,15 @@ class Node2vec(nn.Module):
         must be positive for the outbound edges of all nodes (although they don't have
         to sum up to one).  The result will be undefined otherwise.
         If omitted, DGL assumes that the neighbors are picked uniformly.
+    dist_measure : func, optional
+        The inverse measure of distance to use for the label of positive examples
+        which is applied on the distance d in the graph between two nodes in a walk. 
+        Should be a decreasing function with domain [0, +inf) and range [0, 1). 
+        Examples include c/(c+d) for c > 0 and c^(-d) for c > 1.
     """
 
     def __init__(self, g, embedding_dim, walk_length, p, q, num_walks=10, window_size=5, num_negatives=5,
-                 use_sparse=True, weight_name=None):
+                 use_sparse=True, weight_name=None, dist_measure=lambda d: torch.div(3,3+d)):#dist_measure=lambda d: torch.pow(1.05, -d)):
         super(Node2vec, self).__init__()
 
         assert walk_length >= window_size
@@ -66,6 +71,8 @@ class Node2vec(nn.Module):
 
         self.embedding = nn.Embedding(self.N, embedding_dim, sparse=use_sparse)
 
+        self.dist_measure = dist_measure
+
     def reset_parameters(self):
         self.embedding.reset_parameters()
 
@@ -80,9 +87,19 @@ class Node2vec(nn.Module):
 
         batch = batch.repeat(self.num_walks)
         # positive
-        pos_traces = node2vec_random_walk(self.g, batch, self.p, self.q, self.walk_length, self.prob)
+        pos_traces, edge_ids = node2vec_random_walk(self.g, batch, self.p, self.q, self.walk_length, self.prob, return_eids=True)
+        # print(pos_traces[0], edge_ids[0])
+
+        # Query the list of edge weights, using the edge ids from the random walks as indices
+        pos_dists = self.g.edata['weight'][edge_ids.long().view(-1)].view(-1, self.walk_length)
+        # # Pad with distance between starting node and itself for unfolding
+        # pos_dists = torch.cat((torch.zeros(len(batch), 1), pos_dists), 1)
+
+        # Perform rolling window on both node trace and corresponding edge distances
         pos_traces = pos_traces.unfold(1, self.window_size, 1)  # rolling window
         pos_traces = pos_traces.contiguous().view(-1, self.window_size)
+        pos_dists = pos_dists.unfold(1, self.window_size-1, 1)
+        pos_dists = pos_dists.contiguous().view(-1, self.window_size-1)
 
         # negative
         neg_batch = batch.repeat(self.num_negatives)
@@ -91,7 +108,7 @@ class Node2vec(nn.Module):
         neg_traces = neg_traces.unfold(1, self.window_size, 1)  # rolling window
         neg_traces = neg_traces.contiguous().view(-1, self.window_size)
 
-        return pos_traces, neg_traces
+        return pos_traces, pos_dists, neg_traces
 
     def forward(self, nodes=None):
         """
@@ -112,7 +129,7 @@ class Node2vec(nn.Module):
         else:
             return emb[nodes]
 
-    def loss(self, pos_trace, neg_trace):
+    def loss(self, pos_trace, pos_dists, neg_trace):
         """
         Computes the loss given positive and negative random walks.
         Parameters
@@ -128,18 +145,22 @@ class Node2vec(nn.Module):
         pos_start, pos_rest = pos_trace[:, 0], pos_trace[:, 1:].contiguous()  # start node and following trace
         w_start = self.embedding(pos_start).unsqueeze(dim=1)
         w_rest = self.embedding(pos_rest)
-        pos_out = (w_start * w_rest).sum(dim=-1).view(-1)
+        pos_out = (w_start * w_rest).sum(dim=-1)
+        # print(pos_trace[0], pos_rest[0], pos_out[0])
 
         # Negative
         neg_start, neg_rest = neg_trace[:, 0], neg_trace[:, 1:].contiguous()
 
         w_start = self.embedding(neg_start).unsqueeze(dim=1)
         w_rest = self.embedding(neg_rest)
-        neg_out = (w_start * w_rest).sum(dim=-1).view(-1)
+        neg_out = (w_start * w_rest).sum(dim=-1)
 
         # compute loss
-        pos_loss = -torch.log(torch.sigmoid(pos_out) + e).mean()
-        neg_loss = -torch.log(1 - torch.sigmoid(neg_out) + e).mean()
+        pos_loss = torch.pow(pos_out - pos_dists, 2).mean()
+        neg_loss = torch.pow(neg_out, 2).mean()
+
+        # pos_loss = -torch.log(torch.sigmoid(pos_out) + e).mean()
+        # neg_loss = -torch.log(1 - torch.sigmoid(neg_out) + e).mean()
 
         return pos_loss + neg_loss
 
@@ -229,12 +250,13 @@ class Node2vecModel(object):
         print(f"...using {self.device}")
 
     def _train_step(self, model, loader, optimizer, device):
+        print("train step")
         model.train()
         total_loss = 0
-        for pos_traces, neg_traces in loader:
-            pos_traces, neg_traces = pos_traces.to(device), neg_traces.to(device)
+        for pos_traces, pos_dists, neg_traces in loader:
+            pos_traces, pos_dists, neg_traces = pos_traces.to(device), pos_dists.to(device), neg_traces.to(device)
             optimizer.zero_grad()
-            loss = model.loss(pos_traces, neg_traces)
+            loss = model.loss(pos_traces, pos_dists, neg_traces)
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
@@ -259,13 +281,14 @@ class Node2vecModel(object):
         learning_rate: float
             learning rate. Default 0.01.
         """
-
+    
         self.model = self.model.to(self.device)
         loader = self.model.loader(batch_size)
         if self.use_sparse:
             optimizer = torch.optim.SparseAdam(list(self.model.parameters()), lr=learning_rate)
         else:
             optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
+        print("Start train")
         for i in range(epochs):
             loss = self._train_step(self.model, loader, optimizer, self.device)
             if self.eval_steps > 0:

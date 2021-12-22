@@ -10,6 +10,7 @@ import scipy
 import yaml
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
+import torch
 
 
 def load_edgelist_file_to_dgl_graph(path: str, undirected: bool, edge_weights=None):
@@ -43,8 +44,85 @@ def load_edgelist_file_to_dgl_graph(path: str, undirected: bool, edge_weights=No
 
     if undirected:  # convert directed graph (as default, all the edges are directed in DGL) to undirected graph
         g = dgl.to_bidirected(g)
+
+    g.edata['weight'] = torch.ones(g.num_edges(),)
     return g
 
+def load_gr_file_to_dgl_graph(path: str, undirected: bool, d_path=""):
+    """
+    Reads a .gr file in which each row contains an edge of the network, then returns a DGL graph.
+    :param path: path to the edgeList file
+    gr file  should contain 4 columns as follows:
+        a 0 276 803
+        a 0 58 774
+        a 0 132 1400
+
+    :param path:
+    :param d_path: graph containing the true distances between points (as opposed to travel distances)
+    :param undirected:
+
+    :return: a DGL graph
+    """
+    input_np = np.loadtxt(path, dtype=np.int, skiprows=7, usecols=(1,2,3))
+    print("Imported file")
+
+    # Move nodes from 1-index to 0-index. Edge weights are travel time. Unit is unknown, however the travel speed used is ~4 cm/unit.
+    # Treat 1000 as the time for a travel "distance" of 1 for now
+    row_indices, col_indices, edge_weights = input_np[:, 0]-1, input_np[:, 1]-1, input_np[:, 2]/1000
+
+    dim = np.max(input_np[:, 0:2])
+
+    input_mx = scipy.sparse.coo_matrix((edge_weights, (row_indices, col_indices)), shape=(dim, dim))
+    g = dgl.from_scipy(input_mx)
+
+    print("Parsed graph")
+
+    if undirected:  # convert directed graph (as default, all the edges are directed in DGL) to undirected graph
+        g = dgl.to_simple(g)
+        g = dgl.to_bidirected(g)
+
+    print(g.num_nodes())
+    print(g.num_edges())
+
+    print("Converted graph")
+
+    # Since the graph has been converted to bidirectional simple, we need to filter the original weights list, then add them
+    weights_dict = {(row_indices[i], col_indices[i]): edge_weights[i] for i in range(input_np.shape[0])}
+    edges1, edges2 = g.edges()
+    for i in range(len(edges1)):
+        edge_weights[i] = weights_dict[edges1[i].item(), edges2[i].item()]
+    edge_weights = edge_weights[:len(edges1)]
+
+    g.edata['weight'] = torch.from_numpy(edge_weights)
+
+    print("Added weights")
+
+    if d_path != "":
+        input_np_dist = np.loadtxt(d_path, dtype=np.int, skiprows=7, usecols=(1,2,3))
+
+        # Assume the distance graph given has the same edges and order as the main graph
+        # Edge weights are real world distance. Unit is decimeters. Convert to meters for ease of use.
+        # Add the real distance as an additional attribute of the graph
+        edge_dists = input_np_dist[:, 2]/10
+
+        dists_dict = {(row_indices[i], col_indices[i]): edge_dists[i] for i in range(input_np.shape[0])}
+        for i in range(len(g.edges()[0])):
+            edge_dists[i] = dists_dict[edges1[i].item(), edges2[i].item()]
+        edge_dists = edge_dists[:len(g.edges()[0])]
+
+        g.edata['dist'] = torch.from_numpy(edge_dists)
+
+        print("Added dists")
+
+    return g
+
+def load_file_to_dgl_graph(path: str, undirected: bool, edge_weights=None, d_path=""):
+    if ".edgelist" in path:
+        return load_edgelist_file_to_dgl_graph(path, undirected, edge_weights)
+    elif ".gr" in path:
+        return load_gr_file_to_dgl_graph(path, undirected, d_path)
+    else:
+        raise ValueError('Unknown file type. Must be either .edgelist or .gr')
 
 def write_file(output_path, obj):
     ## Write to file

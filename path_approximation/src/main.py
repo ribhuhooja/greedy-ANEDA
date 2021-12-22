@@ -4,13 +4,15 @@ from datetime import datetime
 from testing_functions import run_routing
 from pprint import pformat, pprint
 
-from data_helper import read_yaml, read_file
+from data_helper import read_yaml, read_file, load_file_to_dgl_graph
 from datasets_generator import create_train_val_test_sets
 from Trainer import Trainer
 from utils import make_log_folder, generate_config_list
 import time
 from neural_net.NeuralNet1 import NeuralNet1
 import numpy as np
+import torch
+import node2vec
 
 if __name__ == '__main__':
     ##### Here is a sample flow to run the project
@@ -20,7 +22,7 @@ if __name__ == '__main__':
     ## Then, follow each of below steps
 
     ## Read the config file:
-    data_generator_config = read_yaml("../configs/data_generator.yaml")
+    data_generator_config = read_yaml("../configs/routing.yaml")
 
     ## Make a log folder to log the experiments
     make_log_folder(log_folder_name=data_generator_config["log_path"])
@@ -41,42 +43,61 @@ if __name__ == '__main__':
 
         # logging.info(config)
 
-        train_dataset = create_train_val_test_sets(config, mode="train")  # for training
-        test_dataset = create_train_val_test_sets(config, mode="test")  # for testing
+    #     train_dataset = create_train_val_test_sets(config, mode="train")  # for training
+    #     test_dataset = create_train_val_test_sets(config, mode="test")  # for testing
 
-        ## Params for the neural net: TODO: separate model's params
-        params_net1 = read_yaml("../configs/neural_net_1.yaml")
+    #     ## Params for the neural net: TODO: separate model's params
+    #     params_net1 = read_yaml("../configs/neural_net_1.yaml")
 
-        #### Train model
-        # set a name to save the model,  `None` (default) means not save the model
-        model_name = "".join(["_file_name-", config["data"]["file_name"],
-                              "_sample_method-", config["landmark"]["sample_method"],
-                              "_sample_ratio_for_training-", str(config["landmark"]["sample_ratio_for_training"]),
-                              "_sample_ratio_for_testing-", str(config["landmark"]["sample_ratio_for_testing"])])
+    #     #### Train model
+    #     # set a name to save the model,  `None` (default) means not save the model
+    #     model_name = "".join(["_file_name-", config["data"]["file_name"],
+    #                           "_sample_method-", config["landmark"]["sample_method"],
+    #                           "_sample_ratio_for_training-", str(config["landmark"]["sample_ratio_for_training"]),
+    #                           "_sample_ratio_for_testing-", str(config["landmark"]["sample_ratio_for_testing"])])
 
-        ## Train
-        # model, val_metrics_list, test_metrics = Trainer.train_model(NeuralNet1, train_dataset, params_net1,
-        #                                                             test_dataset=test_dataset, model_name=model_name)
-        #
-        # ## If we want to load a saved model:
-        # new_model = Trainer.load_model(NeuralNet1, params=params_net1, model_name=model_name)
-        #
-        # ## Sanity check
-        # assert Trainer.compare_2_models(model, new_model), "The 2 models are different!"
+    #     ## Train
+    #     # model, val_metrics_list, test_metrics = Trainer.train_model(NeuralNet1, train_dataset, params_net1,
+    #     #                                                             test_dataset=test_dataset, model_name=model_name)
+    #     #
+    #     # ## If we want to load a saved model:
+    #     # new_model = Trainer.load_model(NeuralNet1, params=params_net1, model_name=model_name)
+    #     #
+    #     # ## Sanity check
+    #     # assert Trainer.compare_2_models(model, new_model), "The 2 models are different!"
 
-        ## We can also call Trainer.maybe_train_model:
-        model, val_metrics_list, test_metrics = Trainer.maybe_train_model(NeuralNet1, train_dataset, params_net1,
-                                                                          test_dataset=test_dataset,
-                                                                          model_name=model_name)
+    #     ## We can also call Trainer.maybe_train_model:
+    #     model, val_metrics_list, test_metrics = Trainer.maybe_train_model(NeuralNet1, train_dataset, params_net1,
+    #                                                                       test_dataset=test_dataset,
+    #                                                                       model_name=model_name)
 
-        ##### Use model to approximate the distance (for demo purpose)
-        emb_of_2_nodes = np.float32(np.random.rand(3, 128))
-        print("Predict: ", Trainer.predict(model, emb_of_2_nodes))
+    #     ##### Use model to approximate the distance (for demo purpose)
+    #     emb_of_2_nodes = np.float32(np.random.rand(3, 128))
+    #     print("Predict: ", Trainer.predict(model, emb_of_2_nodes))
 
-        ## log metrics for val, test sets
-        # logging.info("val metrics list:\n" + pformat(list(zip(range(1, len(val_metrics_list) + 1), val_metrics_list))))
-        logging.info(config['landmark'])
-        logging.info("loss and metrics on test set:\n" + str(test_metrics))
+    #     ## log metrics for val, test sets
+    #     # logging.info("val metrics list:\n" + pformat(list(zip(range(1, len(val_metrics_list) + 1), val_metrics_list))))
+    #     logging.info(config['landmark'])
+    #     logging.info("loss and metrics on test set:\n" + str(test_metrics))
+
+
+        file_name = config["data"]["file_name"]
+        ##### Step 1. Read data
+        ## Load input file into a DGL graph
+        input_path = config["data"]["input_path"].format(file_name=file_name)
+        graph = load_file_to_dgl_graph(path=input_path, undirected=True)
+
+        ##### Step 2. Run Node2Vec to get the embedding
+        node2vec_args = config["node2vec"]
+        embedding_output_path = config["data"]["embedding_output_path"].format(file_name=file_name,
+                                                                            epochs=node2vec_args["epochs"],
+                                                                            lr=node2vec_args["lr"])
+        if os.path.isfile(embedding_output_path):
+            embedding = read_file(embedding_output_path)
+            print(f"Embedding already exists! Read back from {embedding_output_path}")
+        else:
+            embedding = node2vec.run_node2vec(graph, eval_set=None, args=node2vec_args, output_path=embedding_output_path)
+        print(f"Done embedding {file_name}!")
 
         ## Measure running time
         t_end = time.time()
@@ -86,4 +107,4 @@ if __name__ == '__main__':
         ##########
         ### Test to see if the routing code can run
         print("----------")
-        run_routing(config, model)
+        run_routing(config, graph, embedding)

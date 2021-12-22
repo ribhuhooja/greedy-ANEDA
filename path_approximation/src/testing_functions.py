@@ -8,7 +8,7 @@ from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
 from sklearn.metrics import accuracy_score, mean_absolute_error, mean_squared_error, mean_absolute_percentage_error
 from torch import tensor, reshape
-from data_helper import load_edgelist_file_to_dgl_graph, read_file
+from data_helper import load_file_to_dgl_graph, read_file, write_file
 import models
 from datasets_generator import create_train_val_test_sets, create_node_test_pairs
 import dgl
@@ -156,7 +156,7 @@ def run_linear_model_with_under_and_over_sampling(file_name, force_recreate_data
     return True
 
 
-def run_routing(config, model):
+def run_routing(config, graph, model):
     """
     Run routing algorithm on given graph with given heuristic and landmark method
     :param config: provide all we need in terms of parameters
@@ -167,34 +167,50 @@ def run_routing(config, model):
     # logging.basicConfig(filename=os.path.join(config["log_path"], f"routing_{str(now)}.log"), level=logging.INFO)
     file_name = config["data"]["file_name"]
 
-    ##### Step 1. Read data
-    ## Load input file into a DGL graph
-    ## convert the `dgl` graph to `networkx` graph. We will use networkx for finding the shortest path
-    input_path = config["data"]["input_path"].format(file_name=file_name)
-    graph = load_edgelist_file_to_dgl_graph(path=input_path, undirected=True,
-                                            edge_weights=None)
+    # ##### Step 1. Read data
+    # ## Load input file into a DGL graph
+    # ## convert the `dgl` graph to `networkx` graph. We will use networkx for finding the shortest path
+    # print("Started loading")
+    # input_path = config["data"]["input_path"].format(file_name=file_name)
+    # graph = load_file_to_dgl_graph(path=input_path, undirected=True, d_path=config["routing"]["dist_path"])
+    # print("Finished loading")
 
-    nx_graph = dgl.to_networkx(graph)
-    print(nx_graph.number_of_nodes())
-    print(nx_graph.number_of_edges())
+    if ".edgelist" in config["data"]["input_path"]:
+        nx_graph = dgl.to_networkx(graph, edge_attrs=['weight'])
+    elif ".gr" in config["data"]["input_path"]:
+        nx_graph = dgl.to_networkx(graph, edge_attrs=['weight']) #, 'dist'])
+
+    # print(nx_graph.number_of_nodes())
+    # print(nx_graph.number_of_edges())
 
     #####  Step 2: Generate test pairs
     ## Sample landmarks, and generate a source dest pair (l, n) for every landmark l and node n
-    pairs = create_node_test_pairs(nx_graph, config)
+    # pairs = create_node_test_pairs(nx_graph, config)
 
     ##### Step 3: Djikstra's
     ## Run Dijkstra's with each pair for baseline time
     gr = GraphRouter(graph=nx_graph)
-    print(len(pairs))
-    indices = np.random.choice(range(len(pairs)), config["routing"]["num_samples"], replace=False)
+    # print(len(pairs))
+    # indices = np.random.choice(range(nx_graph.number_of_edges()), config["routing"]["num_samples"], replace=False)
+    pairs = []
+
+    print("Dijkstra's")
+    sum_visited = 0
     curr_time = datetime.now()
-    for idx, i in enumerate(indices):
-        if idx % 100 == 0:
-            print(idx)
-        u, v = pairs[i]
+    for i in range(config["routing"]["num_samples"]):
+    # for idx, i in enumerate(indices):
+        if i % 5 == 0:
+            print(i)
+        # u, v = pairs[i]
+        u = np.random.choice(range(nx_graph.number_of_nodes()))
+        v = np.random.choice(range(nx_graph.number_of_nodes()))
+        pairs.append((u,v))
         # print(u, v)
-        _ = gr.astar(u, v)
+        # _ = gr.dijkstra(u, v)
+        # _, num_visited = gr.astar(u, v)
+        # sum_visited += num_visited
     print(datetime.now() - curr_time)
+    print(sum_visited / config["routing"]["num_samples"])
 
 
     # Load embeddings and distance measure. Generate heuristic function
@@ -203,19 +219,68 @@ def run_routing(config, model):
     embedding_output_path = config["data"]["embedding_output_path"].format(file_name=file_name,
                                                                            epochs=node2vec_args["epochs"],
                                                                            lr=node2vec_args["lr"])
-    embedding = read_file(embedding_output_path)
+    # embedding = read_file(embedding_output_path)
 
-    # gr.heuristic = lambda x, y: 10
-    gr.heuristic = lambda x, y: Trainer.predict(model, np.array((embedding[x] + embedding[y]) / 2.0).reshape(1,-1))[0]
+    def h(x,y):
+        # return -np.log(np.dot(model[x], model[y]))
+        d = np.dot(model[x], model[y])
+        if d == 0:
+            return 0
+        return 3*(1-d)/d
+
+    gr.distances = {}
+    if ".edgelist" in config["data"]["input_path"]:
+        # gr.heuristic = lambda x, y: Trainer.predict(model, np.array((embedding[x] + embedding[y]) / 2.0).reshape(1,-1))[0]
+        gr.heuristic = h #-np.log(np.dot(model[x], model[y]))
+    elif ".gr" in config["data"]["input_path"]:
+        gr.heuristic = h # lambda x, y: gr.graph.get_edge_data(x, y)['dist']
 
     # predict(model: nn.Module, x: Union[np.array, torch.Tensor])
 
     # Run A* with each pair and heuristic for test time
+    # print(len(gr.distances.keys()))
+    print("A* with DL heuristic")
     curr_time = datetime.now()
-    for idx, i in enumerate(indices):
-        if idx % 100 == 0:
+    sum_visited = 0
+    for idx, p in enumerate(pairs):
+        if idx % 5 == 0:
             print(idx)
-        u, v = pairs[i]
+        # u, v = p # pairs[i]
         # print(u, v)
-        _ = gr.astar(u, v)
+        #_, num_visited = gr.astar(u, v)
+        # sum_visited += num_visited
     print(datetime.now() - curr_time)
+    print(sum_visited / len(pairs))
+    # write_file("./distances.json", gr.distances)
+
+    coord_table = np.loadtxt(config["routing"]["coord_path"], dtype=np.int, skiprows=7, usecols=(2,3))/(10**6)
+
+    def h1(x, y):
+        R = 6731
+        p = np.pi/180
+        lat_x, long_x, lat_y, long_y = coord_table[x][1], coord_table[x][0], coord_table[y][1], coord_table[y][0]
+        
+        a = 0.5 - np.cos((lat_y-lat_x)*p)/2 + np.cos(lat_x*p)*np.cos(lat_y*p) * (1-np.cos((long_y-long_x)*p))/2
+        return 2*R*np.arcsin(np.sqrt(a))
+
+    gr.distances = {}
+    if ".gr" in config["data"]["input_path"]:
+        gr.heuristic = h1
+
+    # predict(model: nn.Module, x: Union[np.array, torch.Tensor])
+
+    # Run A* with each pair and heuristic for test time
+    # print(len(gr.distances.keys()))
+    print("A* with true dist heuristic")
+    curr_time = datetime.now()
+    sum_visited = 0
+    for idx, p in enumerate(pairs):
+        if idx % 5 == 0:
+            print(idx)
+        u, v = p # pairs[i]
+        # print(u, v)
+        _, num_visited = gr.astar(u, v)
+        sum_visited += num_visited
+    print(datetime.now() - curr_time)
+    print(sum_visited / len(pairs))
+    # write_file("./distances.json", gr.distances)

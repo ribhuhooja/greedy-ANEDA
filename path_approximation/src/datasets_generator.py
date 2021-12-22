@@ -43,8 +43,7 @@ def create_train_val_test_sets(config, mode):
     ##### Step 1. Read data
     ## Load input file into a DGL graph
     input_path = config["data"]["input_path"].format(file_name=file_name)
-    graph = data_helper.load_edgelist_file_to_dgl_graph(path=input_path, undirected=True,
-                                                        edge_weights=None)
+    graph = data_helper.load_file_to_dgl_graph(path=input_path, undirected=True)
 
     ##### Step 2. Run Node2Vec to get the embedding
     node2vec_args = config["node2vec"]
@@ -161,9 +160,11 @@ def create_node_test_pairs(graph, config):
         raise ValueError(
             f"landmark sampling method should be in ['betweenness_centrality', 'closeness_centrality','random','high_degree','medium_degree'], instead of {sample_method}!")
     pairs = []
+    print(len(landmark_nodes))
     # Generate source, dest pairs
-    for landmark in landmark_nodes:
+    for i,landmark in enumerate(landmark_nodes):
         node_dists = nx.shortest_path_length(G=graph, source=landmark)
         for node, _ in node_dists.items():
             pairs.append((landmark, node))
+        print(i)
     return pairs
