@@ -123,6 +123,7 @@ class GraphRouter():
             dictionary of edge attributes for that edge. The function must
             return a number.
         """
+        visited = []
         push = heappush
         pop = heappop
         if not callable(weight):
@@ -146,7 +147,9 @@ class GraphRouter():
 
         while queue:
             # Pop the smallest item from queue.
-            _, __, curnode, dist, parent = pop(queue)
+            length_est, __, curnode, dist, parent = pop(queue)
+            # print(length_est-dist, dist, end=" || ")
+            visited.append(curnode)
             num_visited += 1
 
             if curnode == target:
@@ -156,7 +159,7 @@ class GraphRouter():
                     path.append(node)
                     node = explored[node]
                 path.reverse()
-                return path, num_visited
+                return path, num_visited, visited
 
             if curnode in explored:
                 # Do not override the parent of starting node
@@ -171,7 +174,7 @@ class GraphRouter():
             explored[curnode] = parent
 
             for neighbor, w in self.graph[curnode].items():
-                ncost = dist + weight(curnode, neighbor, w)
+                ncost = dist + w[0]["length"]# weight(curnode, neighbor, w)
                 if neighbor in enqueued:
                     qcost, h = enqueued[neighbor]
                     # if qcost <= ncost, a less costly path from the

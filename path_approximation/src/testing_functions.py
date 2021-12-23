@@ -226,7 +226,7 @@ def run_routing(config, graph, model):
         d = np.dot(model[x], model[y])
         if d == 0:
             return 0
-        return 3*(1-d)/d
+        return (1-d)/d
 
     gr.distances = {}
     if ".edgelist" in config["data"]["input_path"]:
@@ -245,10 +245,10 @@ def run_routing(config, graph, model):
     for idx, p in enumerate(pairs):
         if idx % 5 == 0:
             print(idx)
-        # u, v = p # pairs[i]
+        u, v = p # pairs[i]
         # print(u, v)
-        #_, num_visited = gr.astar(u, v)
-        # sum_visited += num_visited
+        _, num_visited = gr.astar(u, v)
+        sum_visited += num_visited
     print(datetime.now() - curr_time)
     print(sum_visited / len(pairs))
     # write_file("./distances.json", gr.distances)
@@ -256,7 +256,7 @@ def run_routing(config, graph, model):
     coord_table = np.loadtxt(config["routing"]["coord_path"], dtype=np.int, skiprows=7, usecols=(2,3))/(10**6)
 
     def h1(x, y):
-        R = 6731
+        R = 6731000
         p = np.pi/180
         lat_x, long_x, lat_y, long_y = coord_table[x][1], coord_table[x][0], coord_table[y][1], coord_table[y][0]
         
@@ -279,8 +279,8 @@ def run_routing(config, graph, model):
             print(idx)
         u, v = p # pairs[i]
         # print(u, v)
-        _, num_visited = gr.astar(u, v)
-        sum_visited += num_visited
+        # _, num_visited = gr.astar(u, v)
+        # sum_visited += num_visited
     print(datetime.now() - curr_time)
     print(sum_visited / len(pairs))
     # write_file("./distances.json", gr.distances)

@@ -50,7 +50,7 @@ class Node2vec(nn.Module):
     """
 
     def __init__(self, g, embedding_dim, walk_length, p, q, num_walks=10, window_size=5, num_negatives=5,
-                 use_sparse=True, weight_name=None, dist_measure=lambda d: torch.div(3,3+d)):#dist_measure=lambda d: torch.pow(1.05, -d)):
+                 use_sparse=True, weight_name=None, init_c=10):
         super(Node2vec, self).__init__()
 
         assert walk_length >= window_size
@@ -71,7 +71,11 @@ class Node2vec(nn.Module):
 
         self.embedding = nn.Embedding(self.N, embedding_dim, sparse=use_sparse)
 
-        self.dist_measure = dist_measure
+        #if use_sparse:
+        #    c = torch.sparse_coo_tensor([[0]], float(init_c))
+        #else:
+        self.c = torch.tensor(float(init_c))
+        #self.register_parameter(name="c", param=torch.nn.Parameter(c))
 
     def reset_parameters(self):
         self.embedding.reset_parameters()
@@ -91,7 +95,7 @@ class Node2vec(nn.Module):
         # print(pos_traces[0], edge_ids[0])
 
         # Query the list of edge weights, using the edge ids from the random walks as indices
-        pos_dists = self.g.edata['weight'][edge_ids.long().view(-1)].view(-1, self.walk_length)
+        pos_dists = self.g.edata['length'][edge_ids.long().view(-1)].view(-1, self.walk_length)
         # # Pad with distance between starting node and itself for unfolding
         # pos_dists = torch.cat((torch.zeros(len(batch), 1), pos_dists), 1)
 
@@ -156,11 +160,12 @@ class Node2vec(nn.Module):
         neg_out = (w_start * w_rest).sum(dim=-1)
 
         # compute loss
-        pos_loss = torch.pow(pos_out - pos_dists, 2).mean()
-        neg_loss = torch.pow(neg_out, 2).mean()
+        # torch.Size([4480, 4])
+        pos_loss = torch.pow(torch.sigmoid(pos_out) - torch.div(self.c, self.c + pos_dists), 2).mean()
+        # neg_loss = torch.pow(neg_out, 2).mean()
 
         # pos_loss = -torch.log(torch.sigmoid(pos_out) + e).mean()
-        # neg_loss = -torch.log(1 - torch.sigmoid(neg_out) + e).mean()
+        neg_loss = -torch.log(1 - torch.sigmoid(neg_out) + e).mean()
 
         return pos_loss + neg_loss
 
@@ -233,10 +238,10 @@ class Node2vecModel(object):
     """
 
     def __init__(self, g, embedding_dim, walk_length, p=1.0, q=1.0, num_walks=1, window_size=5,
-                 num_negatives=5, use_sparse=True, weight_name=None, eval_set=None, eval_steps=-1, device='cpu'):
+                 num_negatives=5, use_sparse=True, weight_name=None, eval_set=None, eval_steps=-1, device='cpu', init_c=10):
 
         self.model = Node2vec(g, embedding_dim, walk_length, p, q, num_walks,
-                              window_size, num_negatives, use_sparse, weight_name)
+                              window_size, num_negatives, use_sparse, weight_name, init_c)
         self.g = g
         self.use_sparse = use_sparse
         self.eval_steps = eval_steps
@@ -249,16 +254,21 @@ class Node2vecModel(object):
 
         print(f"...using {self.device}")
 
-    def _train_step(self, model, loader, optimizer, device):
-        print("train step")
+    def _train_step(self, model, loader, optimizer, device, c_optimizer=None):
         model.train()
         total_loss = 0
         for pos_traces, pos_dists, neg_traces in loader:
-            pos_traces, pos_dists, neg_traces = pos_traces.to(device), pos_dists.to(device), neg_traces.to(device)
+            pos_traces = pos_traces.to(device)
+            pos_dists = pos_dists.to(device)
+            neg_traces = neg_traces.to(device)
             optimizer.zero_grad()
+            if c_optimizer:
+                c_optimizer.zero_grad()
             loss = model.loss(pos_traces, pos_dists, neg_traces)
             loss.backward()
             optimizer.step()
+            if c_optimizer:
+                c_optimizer.step()
             total_loss += loss.item()
         return total_loss / len(loader)
 
@@ -285,12 +295,16 @@ class Node2vecModel(object):
         self.model = self.model.to(self.device)
         loader = self.model.loader(batch_size)
         if self.use_sparse:
-            optimizer = torch.optim.SparseAdam(list(self.model.parameters()), lr=learning_rate)
+            params = list(self.model.parameters())
+            optimizer = torch.optim.SparseAdam(params, lr=learning_rate)
+            c_optimizer = None #torch.optim.Adam([params[0]], lr=learning_rate)
         else:
             optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
-        print("Start train")
+            c_optimizer=None
+
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.995)
         for i in range(epochs):
-            loss = self._train_step(self.model, loader, optimizer, self.device)
+            loss = self._train_step(self.model, loader, optimizer, self.device, c_optimizer)
             if self.eval_steps > 0:
                 if epochs % self.eval_steps == 0:
                     if self.eval_set is not None:
@@ -298,6 +312,8 @@ class Node2vecModel(object):
                         print("Epoch: {}, Train Loss: {:.4f}, Val Acc: {:.4f}".format(i + 1, loss, acc))
                     else:
                         print("Epoch: {}, Train Loss: {:.4f}".format(i + 1, loss))
+                    # print("c: {}".format(self.model.c))
+            scheduler.step()
 
     def embedding(self, nodes=None):
         """
@@ -334,6 +350,8 @@ def run_node2vec(graph, eval_set=None, args=None, output_path=None):
                             p=args.p,
                             q=args.q,
                             num_walks=args.num_walks,
+                            num_negatives=args.num_negatives,
+                            init_c=1000, #args.walk_length*graph.edata['length'].mean().item(),
                             eval_set=eval_set,
                             eval_steps=1,
                             device=args.device)

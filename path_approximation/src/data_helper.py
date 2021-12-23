@@ -68,6 +68,7 @@ def load_gr_file_to_dgl_graph(path: str, undirected: bool, d_path=""):
 
     # Move nodes from 1-index to 0-index. Edge weights are travel time. Unit is unknown, however the travel speed used is ~4 cm/unit.
     # Treat 1000 as the time for a travel "distance" of 1 for now
+    # After transformation, weights have average 3.126, median: 2.333, std: 2.646
     row_indices, col_indices, edge_weights = input_np[:, 0]-1, input_np[:, 1]-1, input_np[:, 2]/1000
 
     dim = np.max(input_np[:, 0:2])

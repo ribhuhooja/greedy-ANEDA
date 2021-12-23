@@ -12,14 +12,15 @@ data:
 node2vec:
   "device": cuda
   "embedding_dim": 128
-  "walk_length": 5
-  "window_size": 5
-  "p": 0
-  "q": 4
-  "num_walks": 5
-  "epochs": 99
-  "batch_size": 64
-  "lr": 0.03
+  "walk_length": 100
+  "window_size": 100
+  "p": 100
+  "q": 0.2
+  "num_walks": 20
+  "num_negatives": 5
+  "epochs": 101
+  "batch_size": 128
+  "lr": 0.01
 
 landmark:
   sample_method: high_degree #[ high_degree, random ]  # valid methods: ['betweenness_centrality', 'closeness_centrality','random','high_degree','medium_degree']
