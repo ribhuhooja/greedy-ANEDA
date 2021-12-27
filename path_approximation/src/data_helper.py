@@ -2,15 +2,19 @@ import json
 import os
 from collections import Counter
 from typing import Dict
+import yaml
 
 import dgl
-import dill
+import networkx as nx
+import osmnx as ox
+
 import numpy as np
 import scipy
-import yaml
+import dill
+import torch
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
-import torch
+
 
 
 def load_edgelist_file_to_dgl_graph(path: str, undirected: bool, edge_weights=None):
@@ -45,10 +49,10 @@ def load_edgelist_file_to_dgl_graph(path: str, undirected: bool, edge_weights=No
     if undirected:  # convert directed graph (as default, all the edges are directed in DGL) to undirected graph
         g = dgl.to_bidirected(g)
 
-    g.edata['weight'] = torch.ones(g.num_edges(),)
+    g.edata['length'] = torch.ones(g.num_edges(),)
     return g
 
-def load_gr_file_to_dgl_graph(path: str, undirected: bool, d_path=""):
+def load_gr_file_to_dgl_graph(path: str, undirected: bool, c_path=""):
     """
     Reads a .gr file in which each row contains an edge of the network, then returns a DGL graph.
     :param path: path to the edgeList file
@@ -94,36 +98,46 @@ def load_gr_file_to_dgl_graph(path: str, undirected: bool, d_path=""):
         edge_weights[i] = weights_dict[edges1[i].item(), edges2[i].item()]
     edge_weights = edge_weights[:len(edges1)]
 
-    g.edata['weight'] = torch.from_numpy(edge_weights)
+    g.edata['length'] = torch.from_numpy(edge_weights)
 
     print("Added weights")
 
-    if d_path != "":
-        input_np_dist = np.loadtxt(d_path, dtype=np.int, skiprows=7, usecols=(1,2,3))
+    if c_path != "":
+        input_np_coord = np.loadtxt(c_path, dtype=np.int, skiprows=7, usecols=(2,3))/(10**6)
 
-        # Assume the distance graph given has the same edges and order as the main graph
-        # Edge weights are real world distance. Unit is decimeters. Convert to meters for ease of use.
-        # Add the real distance as an additional attribute of the graph
-        edge_dists = input_np_dist[:, 2]/10
+        g.ndata['x'] = torch.from_numpy(input_np_coord[:, 0])
+        g.ndata['y'] = torch.from_numpy(input_np_coord[:, 1])
 
-        dists_dict = {(row_indices[i], col_indices[i]): edge_dists[i] for i in range(input_np.shape[0])}
-        for i in range(len(g.edges()[0])):
-            edge_dists[i] = dists_dict[edges1[i].item(), edges2[i].item()]
-        edge_dists = edge_dists[:len(g.edges()[0])]
-
-        g.edata['dist'] = torch.from_numpy(edge_dists)
-
-        print("Added dists")
+        print("Added coordinates")
 
     return g
 
-def load_file_to_dgl_graph(path: str, undirected: bool, edge_weights=None, d_path=""):
+def load_dgl_graph(path, undirected: bool, edge_weights=None, d_path=""):
+    """
+    Loads dgl graph from file in either edgelist or gr format
+    """
     if ".edgelist" in path:
         return load_edgelist_file_to_dgl_graph(path, undirected, edge_weights)
     elif ".gr" in path:
         return load_gr_file_to_dgl_graph(path, undirected, d_path)
     else:
         raise ValueError('Unknown file type. Must be either .edgelist or .gr')
+
+def download_networkx_graph(query, type, path=""):
+    """
+    Downloads a networkx graph from osmnx using the given query
+    """
+    # If not provided, assume the save path is a combination of the query and type in the data folder
+    if path == "":
+        path = "../data/{}-{}.pkl".format(query, type)
+    if os.path.isfile(path):
+        G = nx.read_gpickle(path)
+    else:
+        G = ox.graph_from_place(query, network_type=type)
+        nx.write_gpickle(G, path)
+    print("Num Nodes: {}".format(G.number_of_nodes()))
+    print("Num Edges: {}".format(G.number_of_edges()))
+    return G
 
 def write_file(output_path, obj):
     ## Write to file
@@ -191,7 +205,7 @@ def remove_data_with_a_few_observations(x, y, min_observations=6):
     return x, y
 
 
-def create_dataset(distance_map: Dict, embedding, binary_operator="average"):
+def create_dataset(distance_map: Dict, embedding, node2idx, binary_operator="average"):
     """
     create data_generator.yaml in which each data point (x,y) is (the embedding of 2 nodes, its distance)
     :param distance_map: dictionary (key, value)=(landmark_node, list_distance_to_each_node_n)
@@ -207,14 +221,14 @@ def create_dataset(distance_map: Dict, embedding, binary_operator="average"):
     node_pairs = set()
     for landmark in tqdm(distance_map.keys()):
         distance_list = distance_map[landmark]
-        for node, distance in enumerate(distance_list):
+        for node, distance in distance_list.items():
             pair_key = tuple(sorted([node, landmark]))
             if node == landmark or distance == np.inf or pair_key in node_pairs:
                 pass
             else:
                 node_pairs.add(pair_key)
                 if binary_operator == "average":
-                    data = (embedding[node] + embedding[landmark]) / 2.0
+                    data = (embedding[node2idx[node]] + embedding[node2idx[landmark]]) / 2.0
                 else:
                     # TODO: Need to implement other binary operators
                     raise ValueError(f"binary_operator is not implemented yet!: {binary_operator}")
@@ -223,3 +237,11 @@ def create_dataset(distance_map: Dict, embedding, binary_operator="average"):
                 label_list.append(label)
 
     return np.array(data_list, dtype=object), np.array(label_list, dtype=np.int16)
+
+def get_file_name(config):
+    file_name = config["graph"]["name"]
+    if config["graph"]["source"] == "osmnx":
+        file_name += "-" + config["graph"]["download_type"]
+    if config["node2vec"]["modified"]:
+        file_name = "modified_"+file_name
+    return file_name

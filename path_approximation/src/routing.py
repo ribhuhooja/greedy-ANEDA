@@ -22,7 +22,7 @@ class GraphRouter():
         return dist
 
     # Modified from https://networkx.org/documentation/stable/_modules/networkx/algorithms/shortest_paths/weighted.html#dijkstra_path
-    def dijkstra(self, source, target, weight="weight"):
+    def dijkstra(self, source, target, weight="length"):
         """Returns a list of nodes in a shortest path between source and target
         using Dijksta's algorithm.
         There may be more than one shortest path. This returns only one.
@@ -78,7 +78,7 @@ class GraphRouter():
                 path.reverse()
                 return path
             for u, e in self.graph[v].items():  # G_succ[v].items():
-                cost = weight(v, u, e)
+                cost = e[0]["length"]
                 if cost is None:
                     continue
                 vu_dist = dist[v] + cost
@@ -101,7 +101,7 @@ class GraphRouter():
 
         # Modified from https://networkx.org/documentation/stable/_modules/networkx/algorithms/shortest_paths/astar.html#astar_path
 
-    def astar(self, source, target, weight="weight"):
+    def astar(self, source, target, weight="length"):
         """Returns a list of nodes in a shortest path between source and target
         using the A* ("A-star") algorithm.
         There may be more than one shortest path.  This returns only one.

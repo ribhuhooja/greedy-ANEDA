@@ -4,28 +4,27 @@
 random_seed: 42
 graph:
   source: "osmnx" # "edgelist", "gr"
-  name: "cambridge ma" # USA-road-t.NY
+  name: "boston" # USA-road-t.NY
   file_path: "../data/{name}.{source}"
-  download_type: "drive" # drive or walk
+  download_type: "walk"
   coord_path: "../data/{name}.co"
   plot_path: "../plots/{name}-epochs{epochs}-lr{lr}-c{init_c}"
 dataset:
   sample_method: high_degree #[ high_degree, random ]  # valid methods: ['betweenness_centrality', 'closeness_centrality','random','high_degree','medium_degree']
-  sample_ratio_for_training: 0.5 #[ 0.2,0.3,0.4,0.5,0.6,0.7 ]
-  sample_ratio_for_testing: 0.7 ## use 0.7  (70%) nodes as landmarks, then get all distance pairs from these landmarks to create labels.
+  sample_ratio_for_training: 0.2 #[ 0.2,0.3,0.4,0.5,0.6,0.7 ]
+  sample_ratio_for_testing: 0.3 ## use 0.7  (70%) nodes as landmarks, then get all distance pairs from these landmarks to create labels.
   embedding_output_path: "../output/embedding/{name}_embed-epochs{epochs}-lr{lr}-d.pkl"
   landmark_distance_output_path: "../output/landmarks_distance/{name}_dist.pkl"
   final_train_val_sets_path: "../output/datasets/{name}_train_val_sets-landmark_ratio-{sample_ratio_for_training}-sample_method-{sample_method}-val_size-{val_size}.pkl"
   final_test_set_path: "../output/datasets/{name}_test_set-landmark_ratio-{sample_ratio_for_testing}-sample_method-{sample_method}.pkl"
 node2vec:
-  "device": cpu
+  "device": cuda
   "embedding_dim": 128
   "walk_length": 5
   "window_size": 5
-  "p": 100
-  "q": 0.2
+  "p": 0.2
+  "q": 4
   "num_walks": 25
-  "num_negatives": 5
   "epochs": 100
   "batch_size": 128
   "lr": 0.01

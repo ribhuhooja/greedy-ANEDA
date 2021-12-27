@@ -4,7 +4,8 @@ import networkx as nx
 import numpy as np
 from tqdm import tqdm
 
-from data_helper import write_file
+from data_helper import read_file, write_file
+import os
 
 
 def get_landmark_custom(g: nx.Graph, portion):
@@ -90,10 +91,8 @@ def calculate_landmarks_distance(landmark_nodes: List, graph: nx.Graph, output_p
     nodes = list(graph.nodes)
 
     distance_map = {}
-    distances = np.zeros((len(nodes),))
-
     for landmark in tqdm(landmark_nodes):
-        distances[:] = np.inf
+        distances = {}
         node_dists = nx.shortest_path_length(G=graph, source=landmark)
         for node_n, dist_to_n in node_dists.items():
             distances[node_n] = dist_to_n
