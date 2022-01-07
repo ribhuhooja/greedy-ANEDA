@@ -242,6 +242,6 @@ def get_file_name(config):
     file_name = config["graph"]["name"]
     if config["graph"]["source"] == "osmnx":
         file_name += "-" + config["graph"]["download_type"]
-    if config["node2vec"]["modified"]:
-        file_name = "modified_"+file_name
+    # if config[]["modified"]:
+    #     file_name = "modified_"+file_name
     return file_name

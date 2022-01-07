@@ -75,7 +75,7 @@ def get_landmark_nodes(num_landmarks: int, graph: nx.Graph, random_seed: int = N
         np.random.seed(random_seed)
 
     ## Pick random nodes from the graph to make them as landmark nodes:
-    landmark_nodes = np.random.choice(range(graph.number_of_nodes()), num_landmarks, replace=False)
+    landmark_nodes = np.random.choice(list(graph.nodes), num_landmarks, replace=False)
     return landmark_nodes
 
 
@@ -88,14 +88,13 @@ def calculate_landmarks_distance(landmark_nodes: List, graph: nx.Graph, output_p
     :return: a dict containing distance from each landmark node `l` to every node in the graph
     """
 
-    nodes = list(graph.nodes)
-
     distance_map = {}
     for landmark in tqdm(landmark_nodes):
         distances = {}
-        node_dists = nx.shortest_path_length(G=graph, source=landmark)
+        node_dists = nx.shortest_path_length(G=graph, source=landmark, weight="length")
         for node_n, dist_to_n in node_dists.items():
-            distances[node_n] = dist_to_n
+            # put distance in kilometers to make training faster
+            distances[node_n] = dist_to_n / 1000
 
         distance_map[landmark] = distances.copy()
 

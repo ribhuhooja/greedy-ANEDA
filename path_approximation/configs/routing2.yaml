@@ -4,15 +4,15 @@
 random_seed: 42
 graph:
   source: "osmnx" # "edgelist", "gr"
-  name: "boston" # USA-road-t.NY
+  name: "cambridge ma" # USA-road-t.NY
   file_path: "../data/{name}.{source}"
   download_type: "walk"
   coord_path: "../data/{name}.co"
-  plot_path: "../plots/{name}-epochs{epochs}-lr{lr}-c{init_c}"
+  plot_path: "../plots/{name}"
 dataset:
-  sample_method: high_degree #[ high_degree, random ]  # valid methods: ['betweenness_centrality', 'closeness_centrality','random','high_degree','medium_degree']
-  sample_ratio_for_training: 0.2 #[ 0.2,0.3,0.4,0.5,0.6,0.7 ]
-  sample_ratio_for_testing: 0.3 ## use 0.7  (70%) nodes as landmarks, then get all distance pairs from these landmarks to create labels.
+  sample_method: random #[ high_degree, random ]  # valid methods: ['betweenness_centrality', 'closeness_centrality','random','high_degree','medium_degree']
+  sample_ratio_for_training: 0.0075 #[ 0.2,0.3,0.4,0.5,0.6,0.7 ]
+  sample_ratio_for_testing: 0.01 ## use 0.7  (70%) nodes as landmarks, then get all distance pairs from these landmarks to create labels.
   embedding_output_path: "../output/embedding/{name}_embed-epochs{epochs}-lr{lr}-d.pkl"
   landmark_distance_output_path: "../output/landmarks_distance/{name}_dist.pkl"
   final_train_val_sets_path: "../output/datasets/{name}_train_val_sets-landmark_ratio-{sample_ratio_for_training}-sample_method-{sample_method}-val_size-{val_size}.pkl"
@@ -28,14 +28,25 @@ node2vec:
   "epochs": 100
   "batch_size": 128
   "lr": 0.01
-  "modified": True
-  "init_c": 1000
+modified_node2vec:
+  "device": cuda
+  "embedding_dim": 128
+  "walk_length": 250
+  "window_size": 250
+  "p": 100
+  "q": 0.1
+  "num_walks": 10
+  "num_negatives": 0
+  "epochs": 150
+  "batch_size": 128
+  "lr": 0.015
+  "init_c": 8942.590442777644
 plot:
   plot_nx_graph: False
 val_size: 0.2 # val/train = 20% / 80%, for training
 log_path: "../output/logs"
-force_recreate_train_and_val_sets: True
-force_recreate_test_set: True
+force_recreate_train_and_val_sets: False
+force_recreate_test_set: False
 write_train_val_sets: True
 write_test_set: True
 parse_tuning_param_by: ->  ## helpful to create a list of configs

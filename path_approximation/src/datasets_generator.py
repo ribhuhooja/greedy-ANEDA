@@ -2,6 +2,8 @@ import os.path
 
 import dgl
 from sklearn.model_selection import train_test_split
+import numpy as np
+import torch
 
 import data_helper
 import landmarks
@@ -10,9 +12,11 @@ from data_helper import read_file
 from utils import plot_nx_graph
 import networkx as nx
 
+from tqdm import tqdm
+
 
 def create_train_val_test_sets(config, nx_graph, embedding, mode):
-    file_name = config["graph"]["name"]
+    file_name = data_helper.get_file_name(config)
     random_seed = config["random_seed"]
 
     if mode == "train":
@@ -77,7 +81,7 @@ def create_train_val_test_sets(config, nx_graph, embedding, mode):
     # Get landmarks' distance: get distance of every pair (l,n), where l is a landmark node, n is a node in the graph
     landmark_distance_output_path = config["dataset"]["landmark_distance_output_path"].format(name=file_name)
     print("Calculating landmarks distance...")
-    distance_map = landmarks.calculate_landmarks_distance(landmark_nodes, nx_graph,
+    distance_map = landmarks.calculate_landmarks_distance(landmark_nodes, nx_graph, 
                                                           output_path=landmark_distance_output_path)
     print("Done landmarks distance!")
 
@@ -90,6 +94,8 @@ def create_train_val_test_sets(config, nx_graph, embedding, mode):
     ##### Step 4: Create datasets to train a model
     x, y = data_helper.create_dataset(distance_map, embedding, node_to_idx)
     x, y = data_helper.remove_data_with_a_few_observations(x, y)
+
+    print("AVERAGE LABEL: {}".format(y.mean()))
 
     if mode == "train":
         print("creating train and val sets for training...")
@@ -122,3 +128,34 @@ def create_train_val_test_sets(config, nx_graph, embedding, mode):
         raise ValueError("mode should be 'train' or 'test'!")
 
     return datasets
+
+def create_coord_dataset(config, nx_graph, node_list, node2idx):
+    sources = np.random.choice(node_list, int(len(node_list) * config["coord2vec"]["sample_ratio"]), replace=False)
+    targets = node_list
+    
+    nodes = []
+    for source in tqdm(sources):
+        for target in targets:
+            nodes.append([node2idx[source], node2idx[target], nx_graph.nodes[source]['y'], nx_graph.nodes[target]['y'], nx_graph.nodes[source]['x'], nx_graph.nodes[target]['x']])
+    
+    nodes = torch.tensor(nodes)
+
+    # Result in km
+    R = 6731
+    p = np.pi/180
+    d = 0.5 - torch.cos((nodes[:, 3]-nodes[:, 2])*p)/2 + torch.cos(nodes[:, 2]*p)*torch.cos(nodes[:, 3]*p) * (1-torch.cos((nodes[:, 5]-nodes[:, 4])*p))/2
+    distances = 2*R*torch.arcsin(torch.sqrt(d))
+    
+    dataset = torch.hstack((nodes[:, 0:2], distances.unsqueeze(dim=1)))
+    return dataset
+
+def create_collab_filtering_dataset(config, nx_graph, node_list, node2idx):
+    sources = np.random.choice(node_list, int(len(node_list) * config["coord2vec"]["sample_ratio"]), replace=False)
+    dataset = []
+    for source in tqdm(sources):
+        node_dists = nx.shortest_path_length(G=nx_graph, source=source, weight="length")
+        for node_n, dist_to_n in node_dists.items():
+            # put distance in kilometers to make training faster
+            dataset.append([node2idx[source], node2idx[node_n], dist_to_n / 1000])
+
+    return torch.tensor(dataset)

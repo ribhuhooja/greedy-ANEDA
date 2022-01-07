@@ -64,7 +64,9 @@ class Node2vec(nn.Module):
         else:
             self.prob = None
 
-        self.embedding = nn.Embedding(self.N, embedding_dim, sparse=use_sparse)
+        # Add an additional embedding for the -1 case in the random walk 
+        # (walk ended early because it reached a node with no outward edges)
+        self.embedding = nn.Embedding(self.N+1, embedding_dim, sparse=use_sparse, padding_idx=0)
 
     def reset_parameters(self):
         self.embedding.reset_parameters()
@@ -126,15 +128,16 @@ class Node2vec(nn.Module):
 
         # Positive
         pos_start, pos_rest = pos_trace[:, 0], pos_trace[:, 1:].contiguous()  # start node and following trace
-        w_start = self.embedding(pos_start).unsqueeze(dim=1)
-        w_rest = self.embedding(pos_rest)
+        # Increment before retrieving embedding to avoid padding vector (only used for -1 entries in walk)
+        w_start = self.embedding(pos_start+1).unsqueeze(dim=1)
+        w_rest = self.embedding(pos_rest+1)
         pos_out = (w_start * w_rest).sum(dim=-1).view(-1)
 
         # Negative
         neg_start, neg_rest = neg_trace[:, 0], neg_trace[:, 1:].contiguous()
 
-        w_start = self.embedding(neg_start).unsqueeze(dim=1)
-        w_rest = self.embedding(neg_rest)
+        w_start = self.embedding(neg_start+1).unsqueeze(dim=1)
+        w_rest = self.embedding(neg_rest+1)
         neg_out = (w_start * w_rest).sum(dim=-1).view(-1)
 
         # compute loss

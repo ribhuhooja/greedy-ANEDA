@@ -101,7 +101,7 @@ class GraphRouter():
 
         # Modified from https://networkx.org/documentation/stable/_modules/networkx/algorithms/shortest_paths/astar.html#astar_path
 
-    def astar(self, source, target, weight="length"):
+    def astar(self, source, target, weight="length", alpha=1):
         """Returns a list of nodes in a shortest path between source and target
         using the A* ("A-star") algorithm.
         There may be more than one shortest path.  This returns only one.
@@ -188,7 +188,7 @@ class GraphRouter():
                     # h = self.heuristic(neighbor, target)
                     # print("       " + str(h))
                 enqueued[neighbor] = ncost, h
-                push(queue, (ncost + h, next(c), neighbor, ncost, curnode))
+                push(queue, (ncost + alpha*h, next(c), neighbor, ncost, curnode))
 
         return None
         # raise nx.NetworkXNoPath(f"Node {target} not reachable from {source}")

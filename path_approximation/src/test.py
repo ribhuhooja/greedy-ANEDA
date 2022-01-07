@@ -1,182 +1,153 @@
-import os
+import logging
+import os.path
 from datetime import datetime
-from sys import path
-
+from testing_functions import run_routing
+from pprint import pformat, pprint
+import time
 import numpy as np
-import matplotlib.pyplot as plt
-import torch
 
-import networkx as nx
-import osmnx as ox
 import dgl
 
-from data_helper import read_yaml, read_file
-from routing import GraphRouter
-import node2vec
+import data_helper
+from datasets_generator import create_train_val_test_sets, create_coord_dataset, create_collab_filtering_dataset
+from Trainer import Trainer
+from utils import make_log_folder, generate_config_list
+from neural_net.NeuralNet1 import NeuralNet1
+import coord2vec
 
-def get_graph(path):
-    if os.path.isfile(path):
-        G = nx.read_gpickle(path)
-    else:
-        G = ox.graph_from_place("Boston, Massachusetts, USA", network_type="walk")
-        nx.write_gpickle(G, path)
-    return G
-
-def get_embeddings(path):
-    dgl_graph = dgl.from_networkx(G, edge_attrs=["length"])
-    print(config['node2vec']['walk_length']*dgl_graph.edata['length'].mean().item())
-
-    if os.path.isfile(path):
-        embedding = read_file(path)
-        print(f"Embedding already exists! Read back from {path}")
-    else:
-        embedding = node2vec.run_node2vec(dgl_graph, eval_set=None, args=config['node2vec'], output_path=path)
-    return embedding
-
-def run_astar(pairs):
-    sum_visited = 0
-    curr_time = datetime.now()
-    for i, p in enumerate(pairs):
-        if i % 10 == 0:
-            print(i)
-        u, v = p
-        _, num_visited, _ = gr.astar(u, v)
-        sum_visited += num_visited
-    print(datetime.now() - curr_time)
-    print(sum_visited / len(pairs))
-
-def run_routing(gr, pairs, embedding):
-
-    print("Dijkstra's")
-    run_astar(pairs)
-
-    node_to_idx = {v: i for i,v in enumerate(list(G.nodes()))}
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
+from CustomDataset import CustomDataset
+from evaluations import evaluate_metrics
 
 
-    def h(x,y):
+if __name__ == '__main__':
+    ##### Here is a sample flow to run the project
+    ## Firstly, change the config files in "/configs"
+    ##      + data_generator.yaml: edit `file_name` to choose the input file. Pick small dataset to start first. The rest of params can be left the same
+    ##      + neural_net_1.yaml: Params for neural net model
+    ## Then, follow each of below steps
 
-        d = np.sigmoid(np.dot(embedding[node_to_idx[x]], embedding[node_to_idx[y]]))
-        if d == 0:
-            return 0
-        D = 5000*(1-d)/d
-        print(D, end=" ")
-        return D
+    ## Read the config file:
+    data_generator_config = data_helper.read_yaml("../configs/collab_filtering.yaml")
 
-    gr.distances = {}
-    gr.heuristic = h
+    ## Make a log folder to log the experiments
+    make_log_folder(log_folder_name=data_generator_config["log_path"])
 
-    print("A* with DL heuristic")
-    run_astar(pairs)
-    
+    ## Make a list of configs, we'll be running the model for each config
+    config_list = generate_config_list(data_generator_config)
 
-    def h1(a, b):
-        R = 6731000
-        p = np.pi/180
-        lat_a, long_a, lat_b, long_b = gr.graph.nodes[a]['y'], gr.graph.nodes[a]['x'], gr.graph.nodes[b]['y'], gr.graph.nodes[b]['x']
+    ## train model with a config
+    for i, config in enumerate(config_list):
+        pprint(config)
+        file_name = data_helper.get_file_name(config)
+
+        t_start = time.time()
+        date_time = datetime.now()
+        logging.basicConfig(
+            filename=os.path.join(config["log_path"], file_name + "_{}.log".format(datetime.strftime(date_time, '%Y%m%d%H%M%S_%f'))),
+            level=logging.INFO)
+        logging.info("Start config " + str(i + 1) + " at " + str(datetime.now()))
+
+        # logging.info(config)
+
+        ##### Step 1. Read data
+        ## Load input file into a DGL graph, or download NetworkX graph and convert
+        if config["graph"]["source"] == "osmnx":
+            # OSMnx graphs have length attribute for edges, and "x" and "y" for nodes denoting longitude and latitude
+            nx_graph = data_helper.download_networkx_graph(config["graph"]["name"], config["graph"]["download_type"])
+            # The node attributes don't need to be kept for dgl since they won't be used in node2vec training,
+            # however the edge weights are used in the modified version
+            dgl_graph = dgl.from_networkx(nx_graph, edge_attrs=["length"])
+        else:
+            # For .gr files, distance and coordinate attributes are imported with the same names as OSMnx for consistency
+            # .edgelist files are unweighted and have no spatial data, so the coordinates path with be ignored
+            input_path = config["graph"]["file_path"].format(file_name=file_name)
+            coord_path= config["graph"]["coord_path"].format(file_name=file_name)
+            dgl_graph = data_helper.load_dgl_graph(path=input_path, undirected=True, c_path=coord_path)
+            nx_graph = dgl.to_networkx(dgl_graph, edge_attrs=['length'])
         
-        d = 0.5 - np.cos((lat_b-lat_a)*p)/2 + np.cos(lat_a*p)*np.cos(lat_b*p) * (1-np.cos((long_b-long_a)*p))/2
-        return 2*R*np.arcsin(np.sqrt(d))
+        node_list = list(nx_graph.nodes)
+        node2idx = {v:i for i,v in enumerate(node_list)}
 
-    gr.distances = {}
-    gr.heuristic = h1
-
-    print("A* with true dist heuristic")
-    run_astar(pairs)
-
-def test_route(gr, f_name, node_to_idx, u, v):
-    G = gr.graph
-
-    route, _, visited = gr.astar(u, v, weight="length")
-    path_length = 0
-    for i in range(1, len(route)):
-        path_length += G.edges[route[i-1], route[i], 0]['length']
-    print()
-    print("path length:", path_length)
-    print()
-    visited = set(visited)
-
-    node_colors = [(1, 1, 1) for _ in range(G.number_of_nodes())]
-    # node_colors[[node_to_idx[n] for n in visited]] = 'r'
-
-    m = len(visited) // 6
-    r, g, b = m, 0, 0
-    updates = [(0,1,0),(-1,0,0),(0,0,1),(0,-1,0),(1,0,0),(0,0,-1)]
-    for i,n in enumerate(visited):
-        j = int((i / m) % 6)
-        r, g, b = r + updates[j][0], g + updates[j][1], b + updates[j][2]
-        node_colors[node_to_idx[n]] = (r/m, g/m, b/m)
-
-    print([(r,g,b) for (r,g,b) in node_colors if r < 0 or r > 1 or g < 0 or g > 1 or b < 0 or b > 1])
-
-    fig, ax = ox.plot.plot_graph(G, node_color=node_colors)
-    fig, ax = ox.plot.plot_graph_route(G, route, route_color='black', ax=ax)
-    fig.savefig(f_name)
-
-config = read_yaml("../configs/routing.yaml")
-g_path = "../data/boston-walk.pkl"
-embedding_path = "../output/embedding/boston-walk2.pkl"
-G = get_graph(g_path)
-embedding = get_embeddings(embedding_path)
-
-gr = GraphRouter(graph=G)
-node_to_idx = {v: i for i,v in enumerate(list(G.nodes()))}
-# pairs = [(np.random.choice(list(G.nodes())), np.random.choice(list(G.nodes()))) for i in range(config["routing"]["num_samples"])]
-# run_routing(gr, pairs, embedding)
-
-u = np.random.choice(list(G.nodes()))
-v = np.random.choice(list(G.nodes()))
-
-if gr.graph.nodes[u]['y'] < gr.graph.nodes[v]['y']:
-    u, v = v, u
-
-# test_route(gr, "dijkstra.png", node_to_idx, u, v)
-
-def h(x,y):
-    dot = np.dot(embedding[node_to_idx[x]], embedding[node_to_idx[y]])
-    d = 1 / (1 + np.exp(-dot))
-    if d == 0:
-        return 0
-    D = 5000*(1-d)/d
-    # print(D, end=" ")
-    return D
-
-gr.distances = {}
-gr.heuristic = h
-test_route(gr, "A*_dl.png", node_to_idx, u, v)
-
-def h1(a, b):
-    R = 6731000
-    p = np.pi/180
-    lat_a, long_a, lat_b, long_b = gr.graph.nodes[a]['y'], gr.graph.nodes[a]['x'], gr.graph.nodes[b]['y'], gr.graph.nodes[b]['x']
     
-    d = 0.5 - np.cos((lat_b-lat_a)*p)/2 + np.cos(lat_a*p)*np.cos(lat_b*p) * (1-np.cos((long_b-long_a)*p))/2
-    D = 2*R*np.arcsin(np.sqrt(d))
-    return D
+        ##### Step 2. Run Coord2Vec to get the embedding
+        coord2vec_args = config["coord2vec"]
+        embedding_output_path = "../output/embedding/{name}_embed-epochs{epochs}-lr{lr}-ratio{ratio}-d.pkl".format(name="coord2vec_"+file_name,
+                                                                            epochs=coord2vec_args["epochs"],
+                                                                            lr=coord2vec_args["lr"],
+                                                                            ratio=coord2vec_args["sample_ratio"])
+        if os.path.isfile(embedding_output_path):
+            coord_embedding = data_helper.read_file(embedding_output_path)
+            print(f"Embedding already exists! Read back from {embedding_output_path}")
+        else:
+            print("Creating dataset")
+            dataset_output_path = "../output/datasets/coord2vec_{}_ratio-{}".format(file_name, config["coord2vec"]["sample_ratio"])
 
-gr.distances = {}
-gr.heuristic = h1
-test_route(gr, "A*_dist.png", node_to_idx, u, v)
+            if os.path.isfile(dataset_output_path):
+                coord_dataset = data_helper.read_file(dataset_output_path)
+                print(f"Dataset already exists! Read back from {dataset_output_path}")
+            else:
+                coord_dataset = create_coord_dataset(config, nx_graph, node_list, node2idx)
+                data_helper.write_file(dataset_output_path, coord_dataset)
+            print("Finished dataset")
+            print("LENGTH:", coord_dataset.size(0))
 
-# gr = GraphRouter(graph=nx_graph)
+            coord_embedding = coord2vec.run_coord2vec(coord_dataset, len(nx_graph.nodes), eval_set=None, args=coord2vec_args, output_path=embedding_output_path)
+        print(f"Done embedding {file_name}!")
 
-# embedding = read_file("../output/embedding/USA-road-t.NY_embed-epochs99-lr0.01-d.pkl")
-# def h(x,y):
-#         # return -np.log(np.dot(model[x], model[y]))
-#         d = np.dot(embedding[x], embedding[y])
-#         if d == 0:
-#             return 0
-#         return (1-d)/d
-# gr.heuristic = h
-# print("A* DL:", gr.astar(u, v)[2])
+        # loss_fn = nn.PoissonNLLLoss(log_input=False, eps=1e-07, reduction='mean')
+        loss_fn = nn.MSELoss(reduction='mean')
+        def real_distance(a, b):
+            R = 6731
+            p = np.pi/180
+            lat_a, long_a, lat_b, long_b = nx_graph.nodes[a]['y'], nx_graph.nodes[a]['x'], nx_graph.nodes[b]['y'], nx_graph.nodes[b]['x'],
+            
+            d = 0.5 - np.cos((lat_b-lat_a)*p)/2 + np.cos(lat_a*p)*np.cos(lat_b*p) * (1-np.cos((long_b-long_a)*p))/2
+            D = 2*R*np.arcsin(np.sqrt(d))
+            return torch.tensor(D)
+        def coord_emb_distance(a, b):
+            x, y = node2idx[a], node2idx[b]
+            left, right = coord_embedding[x], coord_embedding[y]
+            out = np.exp(-np.dot(left, right))
+            return torch.tensor(out)
 
-# coord_table = np.loadtxt(coord_path, dtype=np.int, skiprows=7, usecols=(2,3))/(10**6)
-# def h1(x, y):
-#     R = 6731
-#     p = np.pi/180
-#     lat_x, long_x, lat_y, long_y = coord_table[x][1], coord_table[x][0], coord_table[y][1], coord_table[y][0]
-    
-#     a = 0.5 - np.cos((lat_y-lat_x)*p)/2 + np.cos(lat_x*p)*np.cos(lat_y*p) * (1-np.cos((long_y-long_x)*p))/2
-#     return 2*R*np.arcsin(np.sqrt(a))
-# gr.distances = {}
-# gr.heuristic = h1
-# print("A* dist:", gr.astar(u, v)[2])
+        errors = []
+        for _ in range(1000):
+            node1, node2 = np.random.choice(node_list), np.random.choice(node_list)
+            errors.append(loss_fn(coord_emb_distance(node1, node2), real_distance(node1, node2)))
+        error = "Coord MSE: {}".format((sum(errors)/len(errors)).item())
+        with open("../output/log.txt", 'w') as f:
+            f.write(error)
+        print(error)
+
+        ##### Step 3. Run Collaborative Filtering using initial embedding to get final embeddings
+        collab_filtering_args = config["collab_filtering"]
+        assert collab_filtering_args["embedding_dim"] >= coord2vec_args["embedding_dim"]
+
+        embedding_output_path = "../output/embedding/{name}_embed-epochs{epochs}-lr{lr}-ratio{ratio}-d.pkl".format(name="collab_filtering_"+file_name,
+                                                                            epochs=collab_filtering_args["epochs"],
+                                                                            lr=collab_filtering_args["lr"],
+                                                                            ratio=collab_filtering_args["sample_ratio"])
+        if os.path.isfile(embedding_output_path):
+            embedding = data_helper.read_file(embedding_output_path)
+            print(f"Embedding already exists! Read back from {embedding_output_path}")
+        else:
+            print("Creating dataset")
+            dataset_output_path = "../output/datasets/collab_filtering_{}_ratio-{}".format(file_name, collab_filtering_args["sample_ratio"])
+
+            if os.path.isfile(dataset_output_path):
+                collab_filtering_dataset = data_helper.read_file(dataset_output_path)
+                print(f"Dataset already exists! Read back from {dataset_output_path}")
+            else:
+                collab_filtering_dataset = create_collab_filtering_dataset(config, nx_graph, node_list, node2idx)
+                data_helper.write_file(dataset_output_path, collab_filtering_dataset)
+            print("Finished dataset")
+
+            init_embedding = np.random.normal(size=(len(nx_graph.nodes), collab_filtering_args["embedding_dim"]))
+            init_embedding[:, 0:coord2vec_args["embedding_dim"]] = coord_embedding
+            init_embedding = torch.from_numpy(init_embedding)
+
+            embedding = coord2vec.run_coord2vec(collab_filtering_dataset, len(nx_graph.nodes), init_embeddings=init_embedding, eval_set=None, args=collab_filtering_args, output_path=embedding_output_path)
+        print(f"Done embedding {file_name}!")
