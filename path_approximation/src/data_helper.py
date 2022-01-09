@@ -245,3 +245,14 @@ def get_file_name(config):
     # if config[]["modified"]:
     #     file_name = "modified_"+file_name
     return file_name
+
+def get_coord_embedding(nx_graph, node_list):
+    R = 6731
+    p = np.pi/180
+    embedding = np.zeros((len(node_list), 3))
+    for i,node in enumerate(node_list):
+        lat, long  = nx_graph.nodes[node]['y']*p, nx_graph.nodes[node]['x']*p
+        vec = R*np.hstack((np.cos(lat)*np.cos(long), np.cos(lat)*np.sin(long), np.sin(lat)))
+        embedding[i] = vec
+    return embedding
+

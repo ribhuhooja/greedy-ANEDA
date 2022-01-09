@@ -12,7 +12,7 @@ from data_helper import write_file
 
 
 # https://github.com/dmlc/dgl/tree/e667545da55017d5dbbd3f243d986506284d3e41/examples/pytorch/node2vec
-class Coord2vec(nn.Module):
+class CollaborativeFiltering(nn.Module):
     """Node2vec model from paper path_approximation: Scalable Feature Learning for Networks <https://arxiv.org/abs/1607.00653>
     Attributes
     ----------
@@ -45,7 +45,7 @@ class Coord2vec(nn.Module):
     """
 
     def __init__(self, dataset, num_nodes, embedding_dim, init_embeddings=None, use_sparse=True):
-        super(Coord2vec, self).__init__()
+        super(CollaborativeFiltering, self).__init__()
         self.dataset = dataset
         self.embedding_dim = embedding_dim
         self.N = num_nodes
@@ -96,18 +96,15 @@ class Coord2vec(nn.Module):
 
         # Positive
         left, right, dist = samples[:, 0].long(), samples[:, 1].long(), samples[:, 2]
-
-        left_emb = self.embedding(left)
-        right_emb = self.embedding(right)
-        out = (left_emb * right_emb).sum(dim=-1).view(-1)
+        left_emb = self.embedding(left).unsqueeze(dim=1)
+        right_emb = self.embedding(right).unsqueeze(dim=1)
+        # out = (left_emb * right_emb).sum(dim=-1).view(-1)
         # print(out.mean(), dist.mean())
-
-        # 1 -> 0
-        # -1 -> inf
-
-        # compute loss
-        h = torch.exp(-out)
+        # h = torch.exp(-out)
         # h = torch.exp(self.bias-out)
+
+        h = torch.cdist(left_emb, right_emb).view(-1) 
+        
         # print("{0:.3f}, {1:.3f}, {2:.3f}".format(h.mean().item(), torch.median(h).item(), dist.mean().item()))
         # print("{0:.3f}".format(h.mean().item()), end=" ")
         loss = self.loss_fn(h, dist)
@@ -123,7 +120,7 @@ class Coord2vec(nn.Module):
         Returns
         -------
         DataLoader
-            Coord2vec training data loader
+            Collaborative Filtering training data loader
         """
         return DataLoader(self.dataset, batch_size=batch_size, shuffle=True)
 
@@ -142,9 +139,9 @@ class Coord2vec(nn.Module):
         return lr.score(x_val, y_val)
 
 
-class Coord2vecModel(object):
+class CollaborativeFilteringModel(object):
     """
-    Wrapper of the ``Coord2Vec`` class with a ``train`` method.
+    Wrapper of the ``CollaborativeFiltering`` class with a ``train`` method.
     Attributes
     ----------
     g: DGLGraph
@@ -184,7 +181,7 @@ class Coord2vecModel(object):
 
     def __init__(self, dataset, num_nodes, embedding_dim, init_embeddings=None, use_sparse=True, eval_set=None, eval_steps=-1, device='cpu'):
 
-        self.model = Coord2vec(dataset, num_nodes, embedding_dim, init_embeddings, use_sparse)
+        self.model = CollaborativeFiltering(dataset, num_nodes, embedding_dim, init_embeddings, use_sparse)
         self.use_sparse = use_sparse
         self.eval_steps = eval_steps
         self.eval_set = eval_set
@@ -252,7 +249,6 @@ class Coord2vecModel(object):
                         print("Epoch: {}, Train Loss: {:.4f}, Val Acc: {:.4f}".format(i + 1, loss, acc))
                     else:
                         print("Epoch: {}, Train Loss: {:.4f}".format(i + 1, loss))
-            print()
 
     def embedding(self, nodes=None):
         """
@@ -270,19 +266,19 @@ class Coord2vecModel(object):
         return self.model(nodes)
 
 
-def run_coord2vec(dataset, num_nodes, init_embeddings=None, eval_set=None, args=None, output_path=None):
+def run_collab_filtering(dataset, num_nodes, init_embeddings=None, eval_set=None, args=None, output_path=None):
     t_tick = time.time()  ## start measuring running time
     if args is None:
-        raise ValueError("need args for coord2vec!")
+        raise ValueError("need args for collaborative filtering!")
 
     # Convert dict to tuple
-    Coord2VecParams = namedtuple('Coord2VecParams', args)
-    args = Coord2VecParams(**args)
+    CollabFilteringParams = namedtuple('CollabFilteringParams', args)
+    args = CollabFilteringParams(**args)
 
-    # train Coord2Vec
-    print("training Coord2Vec, it will take a while...")
-    print("coord2vec's arguments:", args)
-    trainer = Coord2vecModel(dataset,
+    # train CollaborativeFiltering
+    print("training CollaborativeFiltering, it will take a while...")
+    print("CollaborativeFiltering arguments:", args)
+    trainer = CollaborativeFilteringModel(dataset,
                             num_nodes=num_nodes,
                             embedding_dim=args.embedding_dim,
                             init_embeddings=init_embeddings,
@@ -294,7 +290,7 @@ def run_coord2vec(dataset, num_nodes, init_embeddings=None, eval_set=None, args=
 
     t_tock = time.time()
 
-    print(f"done training coord2vec, running time = {np.round((t_tock - t_tick) / 60)} minutes.")
+    print(f"done training CollaborativeFiltering, running time = {np.round((t_tock - t_tick) / 60)} minutes.")
     # Calc embedding
     embedding = trainer.embedding().data
 

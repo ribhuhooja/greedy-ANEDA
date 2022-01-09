@@ -1,7 +1,7 @@
 import logging
 import os.path
 from datetime import datetime
-from testing_functions import run_routing
+from testing_functions import run_routing2
 from pprint import pformat, pprint
 import time
 import numpy as np
@@ -13,7 +13,7 @@ from datasets_generator import create_train_val_test_sets, create_coord_dataset,
 from Trainer import Trainer
 from utils import make_log_folder, generate_config_list
 from neural_net.NeuralNet1 import NeuralNet1
-import coord2vec
+import collaborative_filtering
 
 import torch
 import torch.nn as nn
@@ -71,65 +71,18 @@ if __name__ == '__main__':
         node_list = list(nx_graph.nodes)
         node2idx = {v:i for i,v in enumerate(node_list)}
 
-    
-        ##### Step 2. Run Coord2Vec to get the embedding
-        coord2vec_args = config["coord2vec"]
-        embedding_output_path = "../output/embedding/{name}_embed-epochs{epochs}-lr{lr}-ratio{ratio}-d.pkl".format(name="coord2vec_"+file_name,
-                                                                            epochs=coord2vec_args["epochs"],
-                                                                            lr=coord2vec_args["lr"],
-                                                                            ratio=coord2vec_args["sample_ratio"])
-        if os.path.isfile(embedding_output_path):
-            coord_embedding = data_helper.read_file(embedding_output_path)
-            print(f"Embedding already exists! Read back from {embedding_output_path}")
-        else:
-            print("Creating dataset")
-            dataset_output_path = "../output/datasets/coord2vec_{}_ratio-{}".format(file_name, config["coord2vec"]["sample_ratio"])
+        #### Step 2. Get initial vectors from coordinates
+        coord_embedding = data_helper.get_coord_embedding(nx_graph, node_list)
 
-            if os.path.isfile(dataset_output_path):
-                coord_dataset = data_helper.read_file(dataset_output_path)
-                print(f"Dataset already exists! Read back from {dataset_output_path}")
-            else:
-                coord_dataset = create_coord_dataset(config, nx_graph, node_list, node2idx)
-                data_helper.write_file(dataset_output_path, coord_dataset)
-            print("Finished dataset")
-            print("LENGTH:", coord_dataset.size(0))
-
-            coord_embedding = coord2vec.run_coord2vec(coord_dataset, len(nx_graph.nodes), eval_set=None, args=coord2vec_args, output_path=embedding_output_path)
-        print(f"Done embedding {file_name}!")
-
-        # loss_fn = nn.PoissonNLLLoss(log_input=False, eps=1e-07, reduction='mean')
-        loss_fn = nn.MSELoss(reduction='mean')
-        def real_distance(a, b):
-            R = 6731
-            p = np.pi/180
-            lat_a, long_a, lat_b, long_b = nx_graph.nodes[a]['y'], nx_graph.nodes[a]['x'], nx_graph.nodes[b]['y'], nx_graph.nodes[b]['x'],
-            
-            d = 0.5 - np.cos((lat_b-lat_a)*p)/2 + np.cos(lat_a*p)*np.cos(lat_b*p) * (1-np.cos((long_b-long_a)*p))/2
-            D = 2*R*np.arcsin(np.sqrt(d))
-            return torch.tensor(D)
-        def coord_emb_distance(a, b):
-            x, y = node2idx[a], node2idx[b]
-            left, right = coord_embedding[x], coord_embedding[y]
-            out = np.exp(-np.dot(left, right))
-            return torch.tensor(out)
-
-        errors = []
-        for _ in range(1000):
-            node1, node2 = np.random.choice(node_list), np.random.choice(node_list)
-            errors.append(loss_fn(coord_emb_distance(node1, node2), real_distance(node1, node2)))
-        error = "Coord MSE: {}".format((sum(errors)/len(errors)).item())
-        with open("../output/log.txt", 'w') as f:
-            f.write(error)
-        print(error)
-
-        ##### Step 3. Run Collaborative Filtering using initial embedding to get final embeddings
+        ##### Step 2. Run Collaborative Filtering using initial embedding to get final embeddings
         collab_filtering_args = config["collab_filtering"]
-        assert collab_filtering_args["embedding_dim"] >= coord2vec_args["embedding_dim"]
+        assert collab_filtering_args["embedding_dim"] >= coord_embedding.shape[1]
 
-        embedding_output_path = "../output/embedding/{name}_embed-epochs{epochs}-lr{lr}-ratio{ratio}-d.pkl".format(name="collab_filtering_"+file_name,
+        embedding_output_path = "../output/embedding/{name}_embed-epochs{epochs}-lr{lr}-ratio{ratio}-d{dim}.pkl".format(name="collab_filtering_"+file_name,
                                                                             epochs=collab_filtering_args["epochs"],
                                                                             lr=collab_filtering_args["lr"],
-                                                                            ratio=collab_filtering_args["sample_ratio"])
+                                                                            ratio=collab_filtering_args["sample_ratio"],
+                                                                            dim=collab_filtering_args["embedding_dim"])
         if os.path.isfile(embedding_output_path):
             embedding = data_helper.read_file(embedding_output_path)
             print(f"Embedding already exists! Read back from {embedding_output_path}")
@@ -146,8 +99,9 @@ if __name__ == '__main__':
             print("Finished dataset")
 
             init_embedding = np.random.normal(size=(len(nx_graph.nodes), collab_filtering_args["embedding_dim"]))
-            init_embedding[:, 0:coord2vec_args["embedding_dim"]] = coord_embedding
+            init_embedding[:, 0:coord_embedding.shape[1]] = coord_embedding
             init_embedding = torch.from_numpy(init_embedding)
 
-            embedding = coord2vec.run_coord2vec(collab_filtering_dataset, len(nx_graph.nodes), init_embeddings=init_embedding, eval_set=None, args=collab_filtering_args, output_path=embedding_output_path)
+            embedding = collaborative_filtering.run_collab_filtering(collab_filtering_dataset, len(nx_graph.nodes), init_embeddings=init_embedding, eval_set=None, args=collab_filtering_args, output_path=embedding_output_path)
         print(f"Done embedding {file_name}!")
+        run_routing2(config, nx_graph, embedding)

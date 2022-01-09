@@ -14,14 +14,14 @@ coord2vec:
   "embedding_dim": 2
   "batch_size": 16384
   "epochs": 100
-  "lr": 0.1
+  "lr": 0.03
   "sample_ratio": 0.3
 collab_filtering:
   "device": cuda
-  "embedding_dim": 10
+  "embedding_dim": 25
   "batch_size": 1024
-  "epochs": 100
-  "lr": 0.3
+  "epochs": 25
+  "lr": 0.0003
   "sample_ratio": 0.3
 plot:
   plot_nx_graph: False

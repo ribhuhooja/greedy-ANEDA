@@ -172,10 +172,9 @@ def run_astar(gr, pairs):
         len_pairs += 1
         max_visited = max(max_visited, num_visited)
         sum_visited += num_visited
-    print(datetime.now() - curr_time)
-    print(sum_visited / len_pairs)
-    print(max_visited)
-    print()
+    print("Total Time:", datetime.now() - curr_time)
+    print("Average Num Visited:", sum_visited / len_pairs)
+    print("Max Num Visited:", max_visited)
 
 def plot_route(gr, f_name, node_to_idx, u, v):
     G = gr.graph
@@ -185,7 +184,7 @@ def plot_route(gr, f_name, node_to_idx, u, v):
     for i in range(1, len(route)):
         path_length += G.edges[route[i-1], route[i], 0]['length']
     visited = set(visited)
-    print("length:", path_length)
+    print("Route Length:", path_length)
 
     node_colors = ["white" for _ in range(G.number_of_nodes())]
 
@@ -245,7 +244,7 @@ def run_routing(config, nx_graph, model, embedding, modified_embedding):
     def dist_heuristic(a, b):
         R = 6731000
         p = np.pi/180
-        lat_a, long_a, lat_b, long_b = nx_graph.nodes[a]['y'], nx_graph.nodes[a]['x'], nx_graph.nodes[b]['y'], nx_graph.nodes[b]['x'],
+        lat_a, long_a, lat_b, long_b = nx_graph.nodes[a]['y'], nx_graph.nodes[a]['x'], nx_graph.nodes[b]['y'], nx_graph.nodes[b]['x']
         
         d = 0.5 - np.cos((lat_b-lat_a)*p)/2 + np.cos(lat_a*p)*np.cos(lat_b*p) * (1-np.cos((long_b-long_a)*p))/2
         D = 2*R*np.arcsin(np.sqrt(d))
@@ -293,3 +292,65 @@ def run_routing(config, nx_graph, model, embedding, modified_embedding):
     # print(sum(distances) / len(distances))
     # plot_path = config["graph"]["plot_path"].format(name="modified_"+file_name)
     # plot_route(gr, plot_path+"c-{init_c}-A*_dl.png".format(init_c=config["modified_node2vec"]["init_c"]), node_to_idx, u, v)
+
+def run_routing2(config, nx_graph, embedding):
+    """
+    Run routing algorithm on given graph with given heuristic and landmark method
+    :param config: provide all we need in terms of parameters
+    :return: ?
+    """
+
+    node_to_idx = {v: i for i,v in enumerate(list(nx_graph.nodes()))}
+    model_distances = []
+    def model_heuristic(x,y):
+        x, y = node_to_idx[x], node_to_idx[y]
+        a, b = embedding[x], embedding[y]
+        D = 1000*np.linalg.norm(a-b)
+        model_distances.append(D)
+        return D
+
+    real_distances = []
+    def dist_heuristic(a, b):
+        R = 6731000
+        p = np.pi/180
+        lat_a, long_a, lat_b, long_b = nx_graph.nodes[a]['y'], nx_graph.nodes[a]['x'], nx_graph.nodes[b]['y'], nx_graph.nodes[b]['x']
+        
+        d = 0.5 - np.cos((lat_b-lat_a)*p)/2 + np.cos(lat_a*p)*np.cos(lat_b*p) * (1-np.cos((long_b-long_a)*p))/2
+        D = 2*R*np.arcsin(np.sqrt(d))
+        real_distances.append(D)
+        return D
+
+    gr = GraphRouter(graph=nx_graph)
+    pairs = [(np.random.choice(list(nx_graph.nodes())), np.random.choice(list(nx_graph.nodes()))) for i in range(config["routing_num_samples"])]
+    length = 0
+    while length < 5000:
+        u, v = np.random.choice(list(nx_graph.nodes())), np.random.choice(list(nx_graph.nodes()))
+        route, _, _ = gr.astar(u, v)
+        length = 0
+        for i in range(1, len(route)):
+            length += gr.graph.edges[route[i-1], route[i], 0]['length']
+    if gr.graph.nodes[u]['y'] < gr.graph.nodes[v]['y']:
+        u, v = v, u
+
+    file_name = data_helper.get_file_name(config)
+    plot_path = config["graph"]["plot_path"].format(name=file_name)
+
+    print("Dijkstra's")
+    run_astar(gr, pairs)
+    plot_route(gr, plot_path+"-dijkstra.png", node_to_idx, u, v)
+    print()
+
+    print("A* with Collaborative Filtering Heuristic")
+    gr.heuristic = model_heuristic
+    gr.distances = {}
+    run_astar(gr, pairs)
+    print("Average Heuristic Output:", sum(model_distances) / len(model_distances))
+    plot_route(gr, plot_path+"-A*_dl.png", node_to_idx, u, v)
+
+    if config["graph"]["source"] == "gr" or config["graph"]["source"] == "osmnx":
+        print("A* with Distance Heuristic")
+        gr.heuristic = dist_heuristic
+        gr.distances = {}
+        run_astar(gr, pairs)
+        print("Average Heuristic Output:", sum(real_distances) / len(real_distances))
+        plot_route(gr, plot_path+"-A*_dist.png", node_to_idx, u, v)
