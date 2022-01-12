@@ -1,7 +1,7 @@
 import logging
 import os.path
 from datetime import datetime
-from testing_functions import run_routing2
+import testing_functions
 from pprint import pformat, pprint
 import time
 import numpy as np
@@ -78,7 +78,7 @@ if __name__ == '__main__':
         collab_filtering_args = config["collab_filtering"]
         assert collab_filtering_args["embedding_dim"] >= coord_embedding.shape[1]
 
-        embedding_output_path = "../output/embedding/{name}_embed-epochs{epochs}-lr{lr}-ratio{ratio}-d{dim}.pkl".format(name="collab_filtering_"+file_name,
+        embedding_output_path = "../output/embedding/{name}_embed-epochs{epochs}-lr{lr}-ratio{ratio}-d{dim}.pkl".format(name="collab_filtering/"+file_name,
                                                                             epochs=collab_filtering_args["epochs"],
                                                                             lr=collab_filtering_args["lr"],
                                                                             ratio=collab_filtering_args["sample_ratio"],
@@ -104,4 +104,4 @@ if __name__ == '__main__':
 
             embedding = collaborative_filtering.run_collab_filtering(collab_filtering_dataset, len(nx_graph.nodes), init_embeddings=init_embedding, eval_set=None, args=collab_filtering_args, output_path=embedding_output_path)
         print(f"Done embedding {file_name}!")
-        run_routing2(config, nx_graph, embedding)
+        testing_functions.run_routing2(config, nx_graph, embedding)

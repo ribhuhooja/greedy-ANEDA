@@ -150,7 +150,7 @@ def create_coord_dataset(config, nx_graph, node_list, node2idx):
     return dataset
 
 def create_collab_filtering_dataset(config, nx_graph, node_list, node2idx):
-    sources = np.random.choice(node_list, int(len(node_list) * config["coord2vec"]["sample_ratio"]), replace=False)
+    sources = np.random.choice(node_list, int(len(node_list) * config["collab_filtering"]["sample_ratio"]), replace=False)
     dataset = []
     for source in tqdm(sources):
         node_dists = nx.shortest_path_length(G=nx_graph, source=source, weight="length")

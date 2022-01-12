@@ -16,6 +16,7 @@ from datasets_generator import create_train_val_test_sets
 import data_helper
 from routing import GraphRouter
 from Trainer import Trainer
+import matplotlib.pyplot as plt
 
 
 def get_test_result(config, file_name, portion, seed, model):
@@ -156,25 +157,29 @@ def run_linear_model_with_under_and_over_sampling(file_name, force_recreate_data
 
     return True
 
-def run_astar(gr, pairs):
+def run_astar(gr, pairs, alpha=1):
+    node_list = list(gr.graph.nodes())
+
     sum_visited = 0
     max_visited = 0
-    len_pairs = 0
-    curr_time = datetime.now()
-    for i, p in enumerate(pairs):
-        if i % 100 == 0:
-            print(i)
-        u, v = p
-        try:
-            _, num_visited, _ = gr.astar(u, v)
-        except TypeError:
-            continue
-        len_pairs += 1
-        max_visited = max(max_visited, num_visited)
-        sum_visited += num_visited
-    print("Total Time:", datetime.now() - curr_time)
-    print("Average Num Visited:", sum_visited / len_pairs)
-    print("Max Num Visited:", max_visited)
+    # curr_time = datetime.now()
+    for i in range(len(pairs)):
+        # if i % 100 == 0:
+        #     print(i)
+        while True:
+            u, v = pairs[i]
+            try:
+                path, num_visited, _ = gr.astar(u, v, alpha=alpha)
+                break
+            except TypeError:
+                pairs[i] = (np.random.choice(node_list), np.random.choice(node_list))
+        max_visited = max(max_visited, num_visited - len(path))
+        sum_visited += (num_visited - len(path))
+    # print("Total Time:", datetime.now() - curr_time)
+    print("Average Unnecessary Visits:", sum_visited / len(pairs))
+    print("Max Unnecessary Visits:", max_visited)
+    return sum_visited / len(pairs), max_visited
+    
 
 def plot_route(gr, f_name, node_to_idx, u, v):
     G = gr.graph
@@ -321,10 +326,11 @@ def run_routing2(config, nx_graph, embedding):
         return D
 
     gr = GraphRouter(graph=nx_graph)
-    pairs = [(np.random.choice(list(nx_graph.nodes())), np.random.choice(list(nx_graph.nodes()))) for i in range(config["routing_num_samples"])]
+    node_list = list(nx_graph.nodes())
+    pairs = np.random.choice(node_list, size=(config["routing_num_samples"], 2)) # [(np.random.choice(node_list), np.random.choice(node_list)) for i in range(config["routing_num_samples"])]
     length = 0
     while length < 5000:
-        u, v = np.random.choice(list(nx_graph.nodes())), np.random.choice(list(nx_graph.nodes()))
+        u, v = np.random.choice(node_list), np.random.choice(node_list)
         route, _, _ = gr.astar(u, v)
         length = 0
         for i in range(1, len(route)):
@@ -346,6 +352,7 @@ def run_routing2(config, nx_graph, embedding):
     run_astar(gr, pairs)
     print("Average Heuristic Output:", sum(model_distances) / len(model_distances))
     plot_route(gr, plot_path+"-A*_dl.png", node_to_idx, u, v)
+    print()
 
     if config["graph"]["source"] == "gr" or config["graph"]["source"] == "osmnx":
         print("A* with Distance Heuristic")
@@ -354,3 +361,69 @@ def run_routing2(config, nx_graph, embedding):
         run_astar(gr, pairs)
         print("Average Heuristic Output:", sum(real_distances) / len(real_distances))
         plot_route(gr, plot_path+"-A*_dist.png", node_to_idx, u, v)
+
+def run_routing3(config, nx_graph, embedding):
+    node_to_idx = {v: i for i,v in enumerate(list(nx_graph.nodes()))}
+    def model_heuristic(x,y):
+        x, y = node_to_idx[x], node_to_idx[y]
+        a, b = embedding[x], embedding[y]
+        D = 1000*np.linalg.norm(a-b)
+        return D
+
+    def dist_heuristic(a, b):
+        R = 6731000
+        p = np.pi/180
+        lat_a, long_a, lat_b, long_b = nx_graph.nodes[a]['y'], nx_graph.nodes[a]['x'], nx_graph.nodes[b]['y'], nx_graph.nodes[b]['x']
+        
+        d = 0.5 - np.cos((lat_b-lat_a)*p)/2 + np.cos(lat_a*p)*np.cos(lat_b*p) * (1-np.cos((long_b-long_a)*p))/2
+        D = 2*R*np.arcsin(np.sqrt(d))
+        return D
+
+    gr = GraphRouter(graph=nx_graph)
+    node_list = list(nx_graph.nodes())
+    pairs = np.random.choice(node_list, size=(config["routing_num_samples"], 2)) # [(np.random.choice(node_list), np.random.choice(node_list)) for i in range(config["routing_num_samples"])]
+
+    run_astar(gr, pairs)
+
+    alphas = [1, 1.25, 1.5, 2, 5, 10]
+    model_avg_visits = []
+    model_max_visits = []
+    dist_avg_visits = []
+    dist_max_visits = []
+
+    for alpha in alphas:
+        print(alpha)
+        gr.heuristic = model_heuristic
+        gr.distances = {}
+        avg_visits, max_visits = run_astar(gr, pairs, alpha)
+        model_avg_visits.append(avg_visits)
+        model_max_visits.append(max_visits)
+
+        gr.heuristic = dist_heuristic
+        gr.distances = {}
+        avg_visits, max_visits = run_astar(gr, pairs, alpha)
+        dist_avg_visits.append(avg_visits)
+        dist_max_visits.append(max_visits)
+
+    print(model_avg_visits)
+    print(dist_avg_visits)
+    print([dist_avg_visits[i]/model_avg_visits[i] for i in range(len(model_avg_visits))])
+    print()
+    print(model_max_visits)
+    print(dist_max_visits)
+    print([dist_max_visits[i]/model_max_visits[i] for i in range(len(model_max_visits))])
+    
+    # plt.plot(alphas, model_avg_visits, label='Model Heuristic')
+    
+    # plt.plot(alphas, dist_avg_visits, label='Distance Heuristic')
+    # plt.legend()
+    # plt.title("Average Unnecessary Visits per Alpha")
+    # plt.savefig("./avg.png")
+    # plt.show()
+
+    # plt.plot(alphas, model_max_visits, label='Model Heuristic')
+    # plt.plot(alphas, dist_max_visits, label='Distance Heuristic')
+    # plt.legend()
+    # plt.title("Maximum Unnecessary Visits per Alpha")
+    # plt.savefig("./max.png")
+
