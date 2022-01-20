@@ -7,6 +7,8 @@ class GraphRouter():
         self.graph = graph
         self.heuristic = heuristic
         self.distances = {}
+        self.node_list = list(self.graph.nodes())
+        self.node_to_idx = {v: i for i,v in enumerate(self.node_list)}
 
     # heuristic is a dictionary of keys (u,v) where u and v are two nodes, and the value is the approximated distance.
     # if the entry is not present, it needs to be calculated at runtime. can be saved between runs
@@ -174,6 +176,8 @@ class GraphRouter():
             explored[curnode] = parent
 
             for neighbor, w in self.graph[curnode].items():
+                if neighbor == 9291948662:
+                    print(curnode)
                 ncost = dist + w[0]["length"]# weight(curnode, neighbor, w)
                 if neighbor in enqueued:
                     qcost, h = enqueued[neighbor]

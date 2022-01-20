@@ -44,11 +44,12 @@ class CollaborativeFiltering(nn.Module):
         If omitted, DGL assumes that the neighbors are picked uniformly.
     """
 
-    def __init__(self, dataset, num_nodes, embedding_dim, init_embeddings=None, use_sparse=True):
+    def __init__(self, dataset, num_nodes, embedding_dim, init_embeddings=None, use_hyperbolic=False, use_sparse=True):
         super(CollaborativeFiltering, self).__init__()
         self.dataset = dataset
         self.embedding_dim = embedding_dim
         self.N = num_nodes
+        self.use_hyperbolic = use_hyperbolic
         self.loss_fn = nn.PoissonNLLLoss(log_input=False, eps=1e-07, reduction='mean')
         
         # Add an additional embedding for the -1 case in the random walk 
@@ -56,10 +57,6 @@ class CollaborativeFiltering(nn.Module):
         self.embedding = nn.Embedding(self.N, embedding_dim, sparse=use_sparse)
         if init_embeddings is not None:
             self.embedding.weight = nn.Parameter(init_embeddings)
-
-
-        # self.register_parameter(name="bias", param=torch.nn.Parameter(dataset[:, 2].mean()))
-        self.register_parameter(name="bias", param=torch.nn.Parameter(torch.tensor(0.0)))
 
     def reset_parameters(self):
         self.embedding.reset_parameters()
@@ -98,15 +95,24 @@ class CollaborativeFiltering(nn.Module):
         left, right, dist = samples[:, 0].long(), samples[:, 1].long(), samples[:, 2]
         left_emb = self.embedding(left).unsqueeze(dim=1)
         right_emb = self.embedding(right).unsqueeze(dim=1)
-        # out = (left_emb * right_emb).sum(dim=-1).view(-1)
-        # print(out.mean(), dist.mean())
-        # h = torch.exp(-out)
-        # h = torch.exp(self.bias-out)
 
-        h = torch.cdist(left_emb, right_emb).view(-1) 
-        
-        # print("{0:.3f}, {1:.3f}, {2:.3f}".format(h.mean().item(), torch.median(h).item(), dist.mean().item()))
-        # print("{0:.3f}".format(h.mean().item()), end=" ")
+        h = torch.cdist(left_emb, right_emb).view(-1)
+        if self.use_hyperbolic:
+            R = 6731
+            left_norm = torch.cdist(left_emb, left_emb).view(-1)
+            right_norm = torch.cdist(right_emb, right_emb).view(-1)
+            delta = torch.div(h**2, (1-left_norm**2)*(1-right_norm**2))
+            h = R*torch.arccosh(1+2*delta)
+        # if self.use_hyperbolic:
+        #     R = 6731
+        #     left_norm = torch.cdist(left_emb[:,:,:3], left_emb[:,:,:3]).view(-1) # torch.linalg.norm(left_emb[:, :3], dim=1)
+        #     right_norm = torch.cdist(right_emb[:,:,:3], right_emb[:,:,:3]).view(-1) # torch.linalg.norm(right_emb[:, :3], dim=1) 
+        #     left_right_norm = torch.cdist(left_emb[:,:,:3], right_emb[:,:,:3]).view(-1) # torch.linalg.norm(left_emb[:, :3] - right_emb[:, :3], dim=1)
+        #     delta = torch.div(left_right_norm**2, (1-left_norm**2)*(1-right_norm**2))
+        #     # print(left_emb.size(), left_norm.size(), right_norm.size(), left_right_norm.size(), delta.size())
+        #     h = R*torch.arccosh(1+2*delta) + torch.cdist(left_emb[:,:,3:], right_emb[:,:,3:]).view(-1)
+        # else:
+        #     h = torch.cdist(left_emb, right_emb).view(-1)
         loss = self.loss_fn(h, dist)
 
         return loss
@@ -179,9 +185,9 @@ class CollaborativeFilteringModel(object):
         device, {'cpu', 'cuda'}, default 'cpu'
     """
 
-    def __init__(self, dataset, num_nodes, embedding_dim, init_embeddings=None, use_sparse=True, eval_set=None, eval_steps=-1, device='cpu'):
+    def __init__(self, dataset, num_nodes, embedding_dim, init_embeddings=None, use_hyperbolic=False, use_sparse=True, eval_set=None, eval_steps=-1, device='cpu'):
 
-        self.model = CollaborativeFiltering(dataset, num_nodes, embedding_dim, init_embeddings, use_sparse)
+        self.model = CollaborativeFiltering(dataset, num_nodes, embedding_dim, init_embeddings, use_hyperbolic, use_sparse)
         self.use_sparse = use_sparse
         self.eval_steps = eval_steps
         self.eval_set = eval_set
@@ -189,23 +195,20 @@ class CollaborativeFilteringModel(object):
         if device == 'cpu':
             self.device = device
         else:
-            self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            # self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            self.device = torch.device(device)
 
         print(f"...using {self.device}")
 
-    def _train_step(self, model, loader, optimizer, device, bias_optimizer=None):
+    def _train_step(self, model, loader, optimizer, device):
         model.train()
         total_loss = 0
         for samples in loader:
             samples = samples.to(device)
             optimizer.zero_grad()
-            if bias_optimizer:
-                bias_optimizer.zero_grad()
             loss = model.loss(samples)
             loss.backward()
             optimizer.step()
-            if bias_optimizer:
-                bias_optimizer.step()
             total_loss += loss.item()
         return total_loss / len(loader)
 
@@ -232,16 +235,13 @@ class CollaborativeFilteringModel(object):
         self.model = self.model.to(self.device)
         loader = self.model.loader(batch_size)
         if self.use_sparse:
-            params = list(self.model.parameters())
-            optimizer = torch.optim.SparseAdam(params[1:], lr=learning_rate)
-            bias_optimizer = torch.optim.Adam(params[0:1], lr=learning_rate*0.1)
+            optimizer = torch.optim.SparseAdam(list(self.model.parameters()), lr=learning_rate)
         else:
             optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
-            bias_optimizer = None
 
         for i in range(epochs):
             # print("Bias: {0:.3f}".format(self.model.bias.item()))
-            loss = self._train_step(self.model, loader, optimizer, self.device, bias_optimizer)
+            loss = self._train_step(self.model, loader, optimizer, self.device)
             if self.eval_steps > 0:
                 if epochs % self.eval_steps == 0:
                     if self.eval_set is not None:
@@ -282,6 +282,7 @@ def run_collab_filtering(dataset, num_nodes, init_embeddings=None, eval_set=None
                             num_nodes=num_nodes,
                             embedding_dim=args.embedding_dim,
                             init_embeddings=init_embeddings,
+                            use_hyperbolic=args.hyperbolic,
                             eval_set=eval_set,
                             eval_steps=1,
                             device=args.device)
@@ -294,7 +295,7 @@ def run_collab_filtering(dataset, num_nodes, init_embeddings=None, eval_set=None
     # Calc embedding
     embedding = trainer.embedding().data
 
-    if args.device == "cuda":
+    if "cuda" in args.device.type:
         embedding = embedding.cpu().numpy()
 
     write_file(output_path, embedding)

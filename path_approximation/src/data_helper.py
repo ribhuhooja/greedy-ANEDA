@@ -256,3 +256,18 @@ def get_coord_embedding(nx_graph, node_list):
         embedding[i] = vec
     return embedding
 
+def get_dist_matrix(nx_graph, node_list, node2idx):
+    # Need to initialize to infinity because not all entries are guaranteed to be filled.
+    # A node may be inaccessible from another in a certain direction
+    matrix = np.empty((len(node_list), len(node_list)))
+    matrix[:] = np.nan# np.ones((len(node_list), len(node_list))) * np.inf
+    sources = node_list
+    for source in tqdm(sources):
+        node_dists = nx.shortest_path_length(G=nx_graph, source=source, weight="length")
+        for node, dist in node_dists.items():
+            i, j = node2idx[source], node2idx[node]
+            if matrix[i][j] == 0 or dist < matrix[i][j]:
+                matrix[i][j] = dist
+    print(np.count_nonzero(matrix == np.inf))
+    return matrix
+

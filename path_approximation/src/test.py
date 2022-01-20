@@ -9,7 +9,7 @@ import numpy as np
 import dgl
 
 import data_helper
-from datasets_generator import create_train_val_test_sets, create_coord_dataset, create_collab_filtering_dataset
+from datasets_generator import create_train_val_test_sets, create_collab_filtering_dataset
 from Trainer import Trainer
 from utils import make_log_folder, generate_config_list
 from neural_net.NeuralNet1 import NeuralNet1
@@ -78,11 +78,12 @@ if __name__ == '__main__':
         collab_filtering_args = config["collab_filtering"]
         assert collab_filtering_args["embedding_dim"] >= coord_embedding.shape[1]
 
-        embedding_output_path = "../output/embedding/{name}_embed-epochs{epochs}-lr{lr}-ratio{ratio}-d{dim}.pkl".format(name="collab_filtering/"+file_name,
+        embedding_output_path = "../output/embedding/{name}_embed-epochs{epochs}-lr{lr}-ratio{ratio}-d{dim}{hyperbolic}.pkl".format(name="collab_filtering/"+file_name,
                                                                             epochs=collab_filtering_args["epochs"],
                                                                             lr=collab_filtering_args["lr"],
                                                                             ratio=collab_filtering_args["sample_ratio"],
-                                                                            dim=collab_filtering_args["embedding_dim"])
+                                                                            dim=collab_filtering_args["embedding_dim"],
+                                                                            hyperbolic="-h" if collab_filtering_args["hyperbolic"] else "")
         if os.path.isfile(embedding_output_path):
             embedding = data_helper.read_file(embedding_output_path)
             print(f"Embedding already exists! Read back from {embedding_output_path}")
@@ -94,14 +95,26 @@ if __name__ == '__main__':
                 collab_filtering_dataset = data_helper.read_file(dataset_output_path)
                 print(f"Dataset already exists! Read back from {dataset_output_path}")
             else:
-                collab_filtering_dataset = create_collab_filtering_dataset(config, nx_graph, node_list, node2idx)
+                collab_filtering_dataset = create_collab_filtering_dataset(nx_graph, collab_filtering_args["sample_ratio"], node_list, node2idx)
                 data_helper.write_file(dataset_output_path, collab_filtering_dataset)
             print("Finished dataset")
-
-            init_embedding = np.random.normal(size=(len(nx_graph.nodes), collab_filtering_args["embedding_dim"]))
+            # /collab_filtering_args["embedding_dim"]
+            init_embedding = np.random.normal(scale=1/collab_filtering_args["embedding_dim"], size=(len(nx_graph.nodes), collab_filtering_args["embedding_dim"]))
+            if collab_filtering_args["hyperbolic"]:
+                coord_embedding = np.divide(coord_embedding, np.linalg.norm(coord_embedding, axis=1)[:, None]) * (np.sqrt(2)-1)
             init_embedding[:, 0:coord_embedding.shape[1]] = coord_embedding
+            # if collab_filtering_args["hyperbolic"]:
+            #     init_embedding = np.divide(init_embedding, np.linalg.norm(init_embedding, axis=1)[:, None]) * (np.sqrt(2)-1)
+            # print(np.mean(init_embedding, axis=0), np.var(init_embedding, axis=0))
+            
             init_embedding = torch.from_numpy(init_embedding)
 
             embedding = collaborative_filtering.run_collab_filtering(collab_filtering_dataset, len(nx_graph.nodes), init_embeddings=init_embedding, eval_set=None, args=collab_filtering_args, output_path=embedding_output_path)
         print(f"Done embedding {file_name}!")
-        testing_functions.run_routing2(config, nx_graph, embedding)
+
+        # Generate all route pairs for Belmont CA to output complete performance percentiles
+        testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_route=False, run_dijkstra=False, run_dist=False, pairs_to_csv=True)
+
+        # Plot routing for specific source and target, and compare to distance
+        # source, target = 65521256, 6728059433
+        # testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=False, plot_route=True, run_dijkstra=False, run_dist=True, source=source, target=target)

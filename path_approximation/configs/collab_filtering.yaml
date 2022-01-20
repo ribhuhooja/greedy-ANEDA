@@ -4,18 +4,26 @@
 random_seed: 42
 graph:
   source: "osmnx" # "edgelist", "gr"
-  name: "cambridge ma" # USA-road-t.NY
+  name: "hartford" # USA-road-t.NY
   file_path: "../data/{name}.{source}"
-  download_type: "walk"
+  download_type: "drive"
   coord_path: "../data/{name}.co"
   plot_path: "../plots/{name}"
 collab_filtering:
-  "device": cuda
-  "embedding_dim": 6
-  "batch_size": 1024
-  "epochs": 25
-  "lr": 0.0003
+  "device": "cuda:5"
+  "embedding_dim": 40
+  "batch_size": 1024 #20750
+  "epochs": 50
+  "lr": 0.0003 # 0.0000003 Epoch: 1, Train Loss: -0.2829
   "sample_ratio": 0.3
+  "hyperbolic": False
+  # "device": cuda
+  # "embedding_dim": 10
+  # "batch_size": 1024 # Epoch: 1, Train Loss: -0.0815
+  # "epochs": 50
+  # "lr": 0.001
+  # "sample_ratio": 0.5
+  # "hyperbolic": False
 plot:
   plot_nx_graph: False
 val_size: 0.2 # val/train = 20% / 80%, for training
@@ -25,4 +33,5 @@ force_recreate_test_set: False
 write_train_val_sets: True
 write_test_set: True
 parse_tuning_param_by: ->  ## helpful to create a list of configs
-routing_num_samples: 1000
+routing_num_samples: 25000
+# df = pd.read_csv("routes.csv", names=["source", "target", "numVisited", "pathLength"])

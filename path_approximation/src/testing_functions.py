@@ -1,8 +1,10 @@
 import logging
+from os import path
 import os.path
 from datetime import datetime
 
 import numpy as np
+from numpy.core.fromnumeric import repeat
 import torch.cuda
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
@@ -17,7 +19,8 @@ import data_helper
 from routing import GraphRouter
 from Trainer import Trainer
 import matplotlib.pyplot as plt
-
+import csv
+from tqdm import tqdm
 
 def get_test_result(config, file_name, portion, seed, model):
     """
@@ -157,214 +160,224 @@ def run_linear_model_with_under_and_over_sampling(file_name, force_recreate_data
 
     return True
 
-def run_astar(gr, pairs, alpha=1):
-    node_list = list(gr.graph.nodes())
-
+def run_astar(gr, pairs, alpha=2):
     sum_visited = 0
     max_visited = 0
-    # curr_time = datetime.now()
-    for i in range(len(pairs)):
-        # if i % 100 == 0:
-        #     print(i)
+    max_length = 0
+    max_pair = None
+    for i in tqdm(range(len(pairs))):
         while True:
             u, v = pairs[i]
             try:
                 path, num_visited, _ = gr.astar(u, v, alpha=alpha)
                 break
             except TypeError:
-                pairs[i] = (np.random.choice(node_list), np.random.choice(node_list))
-        max_visited = max(max_visited, num_visited - len(path))
-        sum_visited += (num_visited - len(path))
-    # print("Total Time:", datetime.now() - curr_time)
+                pairs[i] = (np.random.choice(gr.node_list), np.random.choice(gr.node_list))
+                continue
+        if num_visited / len(path) > max_visited:
+            max_visited = num_visited / len(path)
+            max_length = len(path)
+            max_pair = pairs[i]
+        sum_visited += (num_visited / len(path))
     print("Average Unnecessary Visits:", sum_visited / len(pairs))
-    print("Max Unnecessary Visits:", max_visited)
+    print("Max Unnecessary Visits:", max_visited, max_length, max_pair)
     return sum_visited / len(pairs), max_visited
-    
 
-def plot_route(gr, f_name, node_to_idx, u, v):
+def run_astar_csv(config, name, gr, pairs, alpha=2):
+    if name == "embedding":
+        csv_path = "../output/routes/embedding-routes-ratio{}.csv".format(config["collab_filtering"]["sample_ratio"])
+    else:
+        csv_path = "../output/routes/{}-routes.csv".format(name)
+    with open(csv_path, 'w') as f:
+        csvwriter = csv.writer(f)
+        csvwriter.writerow(["source", "target", "numVisited", "pathLength", "uniqueVisited"])
+        for i in tqdm(range(len(pairs))):
+            u, v = pairs[i]
+            #try:
+            path, num_visited, visited = gr.astar(u, v, alpha=alpha)
+            #except TypeError:
+            #    continue
+            csvwriter.writerow([u, v, num_visited, len(path), len(set(visited))])
+      
+
+def plot_route(gr, f_name, u, v):
     G = gr.graph
 
-    route, _, visited = gr.astar(u, v, weight="length")
+    route, num_visited, visited = gr.astar(u, v, weight="length", alpha=2)
     path_length = 0
     for i in range(1, len(route)):
         path_length += G.edges[route[i-1], route[i], 0]['length']
-    visited = set(visited)
+
+    with open('visited.txt', 'w') as f:
+        for item in visited:
+            f.write("%s\n" % item)
+
+    mid_node = None
+    length_runner = 0
+    for i in range(1, len(route)):
+        length_runner += G.edges[route[i-1], route[i], 0]['length']
+        if length_runner >= path_length // 2:
+            mid_node = route[i-1]
+            break
+    bbox = ox.utils_geo.bbox_from_point((G.nodes[mid_node]['y'], G.nodes[mid_node]['x']), dist=path_length/2)
+
+    visited_nodes = {}
+    for node in visited:
+        if node in visited_nodes:
+            visited_nodes[node] += 1
+        else:
+            visited_nodes[node] = 1
+    repeat_nodes = []
+    for node, count in visited_nodes.items():
+        if count > 1:
+            repeat_nodes.append(node)
+
     print("Route Length:", path_length)
+    print("Number of nodes in path:", len(route))
+    print("Num visited:", num_visited)
+    print("Unique nodes visited:", len(visited_nodes.keys()))
 
     node_colors = ["white" for _ in range(G.number_of_nodes())]
 
-    # m = len(visited) // 6
-    # r, g, b = m, 0, 0
-    # updates = [(0,1,0),(-1,0,0),(0,0,1),(0,-1,0),(1,0,0),(0,0,-1)]
-    for i,n in enumerate(visited):
-        node_colors[node_to_idx[n]] = "blue"
-    #     j = int((i / m) % 6)
-    #     r, g, b = r + updates[j][0], g + updates[j][1], b + updates[j][2]
-    #     node_colors[node_to_idx[n]] = (r/m, g/m, b/m)
+    for i,n in enumerate(visited_nodes.keys()):
+        node_colors[gr.node_to_idx[n]] = "blue"
+    for i,n in enumerate(repeat_nodes):
+        node_colors[gr.node_to_idx[n]] = "orange"
 
-    fig, ax = ox.plot.plot_graph(G, node_color=node_colors)
+    fig, ax = ox.plot.plot_graph(G, node_color=node_colors, bbox=bbox)
     fig, ax = ox.plot.plot_graph_route(G, route, route_color='red', ax=ax)
     fig.savefig(f_name)
 
-def run_routing(config, nx_graph, model, embedding, modified_embedding):
-    """
-    Run routing algorithm on given graph with given heuristic and landmark method
-    :param config: provide all we need in terms of parameters
-    :return: ?
-    """
-    # A = modified_embedding @ modified_embedding.T
-    # B = np.divide(1, 1+np.exp(-A))
-    # print(np.mean(A))
-    # print(np.std(A))
-    # print(np.max(A))
-    # print(np.min(A))
-    # print()
-    # print(np.mean(np.divide(1-B, B)))
+def test_routing_pairs(config, gr, heuristics, pairs_to_csv, alpha=2):
+    print("Testing pairs")
+    if pairs_to_csv:
+        pairs = [(gr.node_list[i], gr.node_list[j]) for i in range(len(gr.node_list)) for j in range(i+1, len(gr.node_list))]
+    else:
+        pairs = np.random.choice(gr.node_list, size=(config["routing_num_samples"], 2))
+    for name, heuristic in heuristics.items():
+        print("A* with {} heuristic".format(name))
+        gr.heuristic = heuristic
+        gr.distances = {}
+        if pairs_to_csv:
+            run_astar_csv(config, name, gr, pairs, alpha=alpha)
+        else:
+            run_astar(gr, pairs, alpha=alpha)
+        print()
 
-    node_to_idx = {v: i for i,v in enumerate(list(nx_graph.nodes()))}
-    distances = []
-    def dot_heuristic(x,y):
-        x, y = node_to_idx[x], node_to_idx[y]
-        # dot = np.dot(modified_embedding[x], modified_embedding[y])
-        # d = 1/(1+np.exp(-dot))
-        # if d == 0:
-        #    return 0
-        # D = config["modified_node2vec"]["init_c"]*(1-d)/d
-        # D = (1-d)/d
+def generate_routing_plots(config, gr, heuristics, source=None, target=None, min_dist=5000):
+    print("Generating plots")
+    file_name = data_helper.get_file_name(config)
+    plot_path = config["graph"]["plot_path"].format(name=file_name)
 
-        D = np.linalg.norm(x-y)#*config["modified_node2vec"]["init_c"]
-        distances.append(D)
+    if source is None and target is None:
+        length = 0
+        while length < min_dist:
+            u, v = np.random.choice(gr.node_list), np.random.choice(gr.node_list)
+            route, _, _ = gr.astar(u, v)
+            length = 0
+            for i in range(1, len(route)):
+                length += gr.graph.edges[route[i-1], route[i], 0]['length']
+        if gr.graph.nodes[u]['y'] < gr.graph.nodes[v]['y']:
+            u, v = v, u
+    elif source is None:
+        u = np.random.choice(gr.node_list)
+    elif target is None:
+        v = np.random.choice(gr.node_list)
+
+    for name, heuristic in heuristics.items():
+        print("A* with {} heuristic".format(name))
+        gr.distances = {}
+        gr.heuristic = heuristic
+        plot_route(gr, plot_path+"-A*_"+name+".png", source, target)
+        print()
+        
+def run_routing_model(config, nx_graph, embedding, model, test_pairs=True, plot_route=True, run_dijkstra=True, run_dist=True):
+    gr = GraphRouter(graph=nx_graph)
+    
+    real_distances = []
+    def dist_heuristic(a, b):
+        R = 6731000
+        p = np.pi/180
+        lat_a, long_a, lat_b, long_b = gr.graph.nodes[a]['y'], gr.graph.nodes[a]['x'], gr.graph.nodes[b]['y'], gr.graph.nodes[b]['x']
+        
+        d = 0.5 - np.cos((lat_b-lat_a)*p)/2 + np.cos(lat_a*p)*np.cos(lat_b*p) * (1-np.cos((long_b-long_a)*p))/2
+        D = 2*R*np.arcsin(np.sqrt(d))
+        real_distances.append(D)
         return D
 
     model_distances = []
     def model_heuristic(x, y):
-        x, y = node_to_idx[x], node_to_idx[y]
+        x, y = gr.node_to_idx[x], gr.node_to_idx[y]
         input = np.array((embedding[x] + embedding[y]) / 2.0).reshape(1,-1)
         # Convert prediction from km to meters
         out = Trainer.predict(model, input)[0]*1000
         model_distances.append(out)
         return out
 
-    real_distances = []
-    def dist_heuristic(a, b):
-        R = 6731000
-        p = np.pi/180
-        lat_a, long_a, lat_b, long_b = nx_graph.nodes[a]['y'], nx_graph.nodes[a]['x'], nx_graph.nodes[b]['y'], nx_graph.nodes[b]['x']
-        
-        d = 0.5 - np.cos((lat_b-lat_a)*p)/2 + np.cos(lat_a*p)*np.cos(lat_b*p) * (1-np.cos((long_b-long_a)*p))/2
-        D = 2*R*np.arcsin(np.sqrt(d))
-        real_distances.append(D)
-        return D
+    heuristics = {}
+    if run_dijkstra:
+        heuristics["dijkstra"] = gr.heuristic
+    if run_dist:
+        heuristics["distance"] = dist_heuristic
+    heuristics["model"] = model_heuristic
 
-    gr = GraphRouter(graph=nx_graph)
-    pairs = [(np.random.choice(list(nx_graph.nodes())), np.random.choice(list(nx_graph.nodes()))) for i in range(config["routing_num_samples"])]
-    length = 0
-    while length < 5000:
-        u, v = np.random.choice(list(nx_graph.nodes())), np.random.choice(list(nx_graph.nodes()))
-        route, _, _ = gr.astar(u, v)
-        length = 0
-        for i in range(1, len(route)):
-            length += gr.graph.edges[route[i-1], route[i], 0]['length']
-    if gr.graph.nodes[u]['y'] < gr.graph.nodes[v]['y']:
-        u, v = v, u
+    if test_pairs:
+        test_routing_pairs(config, gr, heuristics)
+    if plot_route:
+        generate_routing_plots(config, gr, heuristics)
 
-    file_name = data_helper.get_file_name(config)
-    plot_path = config["graph"]["plot_path"].format(name=file_name)
-
-    print("Dijkstra's")
-    run_astar(gr, pairs)
-    plot_route(gr, plot_path+"-dijkstra.png", node_to_idx, u, v)
-
-    print("A* with DL heuristic")
-    gr.heuristic = model_heuristic
-    gr.distances = {}
-    run_astar(gr, pairs)
-    print(sum(model_distances) / len(model_distances))
-    plot_route(gr, plot_path+"-A*_dl.png", node_to_idx, u, v)
-
-    if config["graph"]["source"] == "gr" or config["graph"]["source"] == "osmnx":
-        print("A* with distance heuristic")
-        gr.heuristic = dist_heuristic
-        gr.distances = {}
-        run_astar(gr, pairs)
-        print(sum(real_distances) / len(real_distances))
-        plot_route(gr, plot_path+"-A*_dist.png", node_to_idx, u, v)
-        
-    # print("A* with modified DL heuristic")
-    # gr.heuristic = dot_heuristic
-    # gr.distances = {}
-    # run_astar(gr, pairs)
-    # print(sum(distances) / len(distances))
-    # plot_path = config["graph"]["plot_path"].format(name="modified_"+file_name)
-    # plot_route(gr, plot_path+"c-{init_c}-A*_dl.png".format(init_c=config["modified_node2vec"]["init_c"]), node_to_idx, u, v)
-
-def run_routing2(config, nx_graph, embedding):
+    if run_dist:
+        print("Average Distance Heuristic:", sum(real_distances) / len(real_distances))
+    print("Average Model Heuristic:", sum(model_distances) / len(model_distances))
+  
+def run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_route=True, run_dijkstra=True, run_dist=True, pairs_to_csv=False, source=None, target=None):
     """
     Run routing algorithm on given graph with given heuristic and landmark method
     :param config: provide all we need in terms of parameters
     :return: ?
     """
-
-    node_to_idx = {v: i for i,v in enumerate(list(nx_graph.nodes()))}
-    model_distances = []
-    def model_heuristic(x,y):
-        x, y = node_to_idx[x], node_to_idx[y]
-        a, b = embedding[x], embedding[y]
-        D = 1000*np.linalg.norm(a-b)
-        model_distances.append(D)
-        return D
-
+    gr = GraphRouter(graph=nx_graph)
+    
     real_distances = []
     def dist_heuristic(a, b):
         R = 6731000
         p = np.pi/180
-        lat_a, long_a, lat_b, long_b = nx_graph.nodes[a]['y'], nx_graph.nodes[a]['x'], nx_graph.nodes[b]['y'], nx_graph.nodes[b]['x']
+        lat_a, long_a, lat_b, long_b = gr.graph.nodes[a]['y'], gr.graph.nodes[a]['x'], gr.graph.nodes[b]['y'], gr.graph.nodes[b]['x']
         
         d = 0.5 - np.cos((lat_b-lat_a)*p)/2 + np.cos(lat_a*p)*np.cos(lat_b*p) * (1-np.cos((long_b-long_a)*p))/2
         D = 2*R*np.arcsin(np.sqrt(d))
         real_distances.append(D)
         return D
 
-    gr = GraphRouter(graph=nx_graph)
-    node_list = list(nx_graph.nodes())
-    pairs = np.random.choice(node_list, size=(config["routing_num_samples"], 2)) # [(np.random.choice(node_list), np.random.choice(node_list)) for i in range(config["routing_num_samples"])]
-    length = 0
-    while length < 5000:
-        u, v = np.random.choice(node_list), np.random.choice(node_list)
-        route, _, _ = gr.astar(u, v)
-        length = 0
-        for i in range(1, len(route)):
-            length += gr.graph.edges[route[i-1], route[i], 0]['length']
-    if gr.graph.nodes[u]['y'] < gr.graph.nodes[v]['y']:
-        u, v = v, u
+    emb_distances = []
+    def embedding_heuristic(x,y):
+        x, y = gr.node_to_idx[x], gr.node_to_idx[y]
+        a, b = embedding[x], embedding[y]
+        D = 1000*np.linalg.norm(a-b)
+        emb_distances.append(D)
+        return D
 
-    file_name = data_helper.get_file_name(config)
-    plot_path = config["graph"]["plot_path"].format(name=file_name)
+    heuristics = {}
+    if run_dijkstra:
+        heuristics["dijkstra"] = gr.heuristic
+    if run_dist:
+        heuristics["distance"] = dist_heuristic
+    heuristics["embedding"] = embedding_heuristic
 
-    print("Dijkstra's")
-    run_astar(gr, pairs)
-    plot_route(gr, plot_path+"-dijkstra.png", node_to_idx, u, v)
-    print()
+    if test_pairs:
+        test_routing_pairs(config, gr, heuristics, pairs_to_csv)
+    if plot_route:
+        generate_routing_plots(config, gr, heuristics, source=source, target=target)
 
-    print("A* with Collaborative Filtering Heuristic")
-    gr.heuristic = model_heuristic
-    gr.distances = {}
-    run_astar(gr, pairs)
-    print("Average Heuristic Output:", sum(model_distances) / len(model_distances))
-    plot_route(gr, plot_path+"-A*_dl.png", node_to_idx, u, v)
-    print()
+    if run_dist:
+        print("Average Distance Heuristic:", sum(real_distances) / len(real_distances))
+    print("Average Embedding Heuristic:", sum(emb_distances) / len(emb_distances))
 
-    if config["graph"]["source"] == "gr" or config["graph"]["source"] == "osmnx":
-        print("A* with Distance Heuristic")
-        gr.heuristic = dist_heuristic
-        gr.distances = {}
-        run_astar(gr, pairs)
-        print("Average Heuristic Output:", sum(real_distances) / len(real_distances))
-        plot_route(gr, plot_path+"-A*_dist.png", node_to_idx, u, v)
+    # if config["graph"]["source"] == "gr" or config["graph"]["source"] == "osmnx":
 
-def run_routing3(config, nx_graph, embedding):
+def run_routing_test_alphas(config, nx_graph, embedding):
     node_to_idx = {v: i for i,v in enumerate(list(nx_graph.nodes()))}
-    def model_heuristic(x,y):
+    def embedding_heuristic(x,y):
         x, y = node_to_idx[x], node_to_idx[y]
         a, b = embedding[x], embedding[y]
         D = 1000*np.linalg.norm(a-b)
@@ -393,7 +406,7 @@ def run_routing3(config, nx_graph, embedding):
 
     for alpha in alphas:
         print(alpha)
-        gr.heuristic = model_heuristic
+        gr.heuristic = embedding_heuristic
         gr.distances = {}
         avg_visits, max_visits = run_astar(gr, pairs, alpha)
         model_avg_visits.append(avg_visits)
@@ -412,18 +425,40 @@ def run_routing3(config, nx_graph, embedding):
     print(model_max_visits)
     print(dist_max_visits)
     print([dist_max_visits[i]/model_max_visits[i] for i in range(len(model_max_visits))])
-    
-    # plt.plot(alphas, model_avg_visits, label='Model Heuristic')
-    
-    # plt.plot(alphas, dist_avg_visits, label='Distance Heuristic')
-    # plt.legend()
-    # plt.title("Average Unnecessary Visits per Alpha")
-    # plt.savefig("./avg.png")
-    # plt.show()
 
-    # plt.plot(alphas, model_max_visits, label='Model Heuristic')
-    # plt.plot(alphas, dist_max_visits, label='Distance Heuristic')
-    # plt.legend()
-    # plt.title("Maximum Unnecessary Visits per Alpha")
-    # plt.savefig("./max.png")
+def run_routing_dist_matrix(config, nx_graph, matrix, test_pairs=True, plot_route=True, run_dijkstra=True, run_dist=True, pairs_to_csv=False, source=None, target=None):
+    gr = GraphRouter(graph=nx_graph)
+    
+    real_distances = []
+    def dist_heuristic(a, b):
+        R = 6731000
+        p = np.pi/180
+        lat_a, long_a, lat_b, long_b = gr.graph.nodes[a]['y'], gr.graph.nodes[a]['x'], gr.graph.nodes[b]['y'], gr.graph.nodes[b]['x']
+        
+        d = 0.5 - np.cos((lat_b-lat_a)*p)/2 + np.cos(lat_a*p)*np.cos(lat_b*p) * (1-np.cos((long_b-long_a)*p))/2
+        D = 2*R*np.arcsin(np.sqrt(d))
+        real_distances.append(D)
+        return D
 
+    true_distances = []
+    def matrix_heuristic(x,y):
+        x, y = gr.node_to_idx[x], gr.node_to_idx[y]
+        dist = matrix[x][y]
+        true_distances.append(dist)
+        return dist
+
+    heuristics = {}
+    if run_dijkstra:
+        heuristics["dijkstra"] = gr.heuristic
+    if run_dist:
+        heuristics["distance"] = dist_heuristic
+    heuristics["true"] = matrix_heuristic
+
+    if test_pairs:
+        test_routing_pairs(config, gr, heuristics, pairs_to_csv, alpha=1000)
+    if plot_route:
+        generate_routing_plots(config, gr, heuristics, source=source, target=target)
+
+    if run_dist:
+        print("Average Distance Heuristic:", sum(real_distances) / len(real_distances))
+    print("Average True Distance:", sum(true_distances) / len(true_distances))

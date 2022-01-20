@@ -149,13 +149,29 @@ def create_coord_dataset(config, nx_graph, node_list, node2idx):
     dataset = torch.hstack((nodes[:, 0:2], distances.unsqueeze(dim=1)))
     return dataset
 
-def create_collab_filtering_dataset(config, nx_graph, node_list, node2idx):
-    sources = np.random.choice(node_list, int(len(node_list) * config["collab_filtering"]["sample_ratio"]), replace=False)
-    dataset = []
+# def create_collab_filtering_dataset(config, nx_graph, node_list, node2idx):
+#     sources = np.random.choice(node_list, int(len(node_list) * config["collab_filtering"]["sample_ratio"]), replace=False)
+#     dataset = []
+#     for source in tqdm(sources):
+#         node_dists = nx.shortest_path_length(G=nx_graph, source=source, weight="length")
+#         for node_n, dist_to_n in node_dists.items():
+#             # put distance in kilometers to make training faster
+#             dataset.append([node2idx[source], node2idx[node_n], dist_to_n / 1000])
+
+#     return torch.tensor(dataset)
+
+def create_collab_filtering_dataset(nx_graph, sample_ratio, node_list, node2idx):
+    sources = np.random.choice(node_list, int(len(node_list) * sample_ratio), replace=False)
+    dataset_map = {}
     for source in tqdm(sources):
         node_dists = nx.shortest_path_length(G=nx_graph, source=source, weight="length")
         for node_n, dist_to_n in node_dists.items():
-            # put distance in kilometers to make training faster
-            dataset.append([node2idx[source], node2idx[node_n], dist_to_n / 1000])
+            if (source, node_n) not in dataset_map or dist_to_n < dataset_map[(source, node_n)]:
+                dataset_map[(source, node_n)] = dist_to_n
+            
+    # put distance in kilometers to make training faster
+    dataset = []
+    for (source, node_n), dist_to_n in tqdm(dataset_map.items()):
+        dataset.append([node2idx[source], node2idx[node_n], dist_to_n / 1000])
 
     return torch.tensor(dataset)
