@@ -295,7 +295,7 @@ def run_collab_filtering(dataset, num_nodes, init_embeddings=None, eval_set=None
     # Calc embedding
     embedding = trainer.embedding().data
 
-    if "cuda" in args.device.type:
+    if "cuda" in args.device:
         embedding = embedding.cpu().numpy()
 
     write_file(output_path, embedding)

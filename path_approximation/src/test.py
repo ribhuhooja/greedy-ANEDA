@@ -97,8 +97,8 @@ if __name__ == '__main__':
             else:
                 collab_filtering_dataset = create_collab_filtering_dataset(nx_graph, collab_filtering_args["sample_ratio"], node_list, node2idx)
                 data_helper.write_file(dataset_output_path, collab_filtering_dataset)
-            print("Finished dataset")
-            # /collab_filtering_args["embedding_dim"]
+            print("Finished dataset. Size:", len(collab_filtering_dataset))
+
             init_embedding = np.random.normal(scale=1/collab_filtering_args["embedding_dim"], size=(len(nx_graph.nodes), collab_filtering_args["embedding_dim"]))
             if collab_filtering_args["hyperbolic"]:
                 coord_embedding = np.divide(coord_embedding, np.linalg.norm(coord_embedding, axis=1)[:, None]) * (np.sqrt(2)-1)
@@ -116,5 +116,5 @@ if __name__ == '__main__':
         testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_route=False, run_dijkstra=False, run_dist=False, pairs_to_csv=True)
 
         # Plot routing for specific source and target, and compare to distance
-        # source, target = 65521256, 6728059433
+        # source, target = 178362470, 178385772
         # testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=False, plot_route=True, run_dijkstra=False, run_dist=True, source=source, target=target)

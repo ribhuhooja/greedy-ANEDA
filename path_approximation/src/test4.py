@@ -76,5 +76,5 @@ if __name__ == '__main__':
         testing_functions.run_routing_dist_matrix(config, nx_graph, matrix, test_pairs=True, plot_route=False, run_dijkstra=False, run_dist=False, pairs_to_csv=True)
 
         # Plot routing for specific source and target, and compare to distance
-        # source, target = 9291948662, 9332704131
+        # source, target = 178362470, 178385772
         # testing_functions.run_routing_dist_matrix(config, nx_graph, matrix, test_pairs=False, plot_route=True, run_dijkstra=False, run_dist=False, source=source, target=target)

@@ -21,6 +21,7 @@ from Trainer import Trainer
 import matplotlib.pyplot as plt
 import csv
 from tqdm import tqdm
+import pandas as pd
 
 def get_test_result(config, file_name, portion, seed, model):
     """
@@ -168,12 +169,13 @@ def run_astar(gr, pairs, alpha=2):
     for i in tqdm(range(len(pairs))):
         while True:
             u, v = pairs[i]
-            try:
-                path, num_visited, _ = gr.astar(u, v, alpha=alpha)
-                break
-            except TypeError:
+            result = gr.astar(u, v, alpha=alpha)
+            if result is None:
                 pairs[i] = (np.random.choice(gr.node_list), np.random.choice(gr.node_list))
                 continue
+            else:
+                path, num_visited, _ = result
+                break
         if num_visited / len(path) > max_visited:
             max_visited = num_visited / len(path)
             max_length = len(path)
@@ -184,26 +186,40 @@ def run_astar(gr, pairs, alpha=2):
     return sum_visited / len(pairs), max_visited
 
 def run_astar_csv(config, name, gr, pairs, alpha=2):
+    file_name = data_helper.get_file_name(config)
+    routes = []
+    columns = ["source", "target", "numVisited", "pathLength", "uniqueVisited"]
     if name == "embedding":
-        csv_path = "../output/routes/embedding-routes-ratio{}.csv".format(config["collab_filtering"]["sample_ratio"])
+        csv_path = "../output/routes/{}/embedding-routes-ratio{}-dim{}{}.csv".format(file_name, config["collab_filtering"]["sample_ratio"], config["collab_filtering"]["embedding_dim"], "-h" if config["collab_filtering"]["hyperbolic"] else "")
     else:
-        csv_path = "../output/routes/{}-routes.csv".format(name)
+        csv_path = "../output/routes/{}/{}-routes.csv".format(file_name, name)
     with open(csv_path, 'w') as f:
         csvwriter = csv.writer(f)
-        csvwriter.writerow(["source", "target", "numVisited", "pathLength", "uniqueVisited"])
+        csvwriter.writerow(columns)
         for i in tqdm(range(len(pairs))):
             u, v = pairs[i]
-            #try:
-            path, num_visited, visited = gr.astar(u, v, alpha=alpha)
-            #except TypeError:
-            #    continue
-            csvwriter.writerow([u, v, num_visited, len(path), len(set(visited))])
+            result = gr.astar(u, v, alpha=alpha)
+            if result != None:
+                path, num_visited, visited = result
+                routes.append([u, v, num_visited, len(path), len(set(visited))])
+                csvwriter.writerow(routes[-1])
+    df = pd.DataFrame(routes, columns=columns)
+    df['performance'] = df['numVisited'] / df['pathLength']
+    df['performance2'] = 1-df['pathLength']/df['numVisited']
+    pd.set_option('display.float_format', lambda x: '%.4f' % x)
+    print(df.describe())
+    print("90th")
+    print(df.nlargest(len(df)//10, 'performance').iloc[-1])
+    print("95th")
+    print(df.nlargest(len(df)//20, 'performance').iloc[-1])
+    print("99th")
+    print(df.nlargest(len(df)//100, 'performance').iloc[-1])
       
 
-def plot_route(gr, f_name, u, v):
+def plot_route(gr, f_name, u, v, alpha=2):
     G = gr.graph
 
-    route, num_visited, visited = gr.astar(u, v, weight="length", alpha=2)
+    route, num_visited, visited = gr.astar(u, v, weight="length", alpha=alpha)
     path_length = 0
     for i in range(1, len(route)):
         path_length += G.edges[route[i-1], route[i], 0]['length']
@@ -252,6 +268,7 @@ def test_routing_pairs(config, gr, heuristics, pairs_to_csv, alpha=2):
     print("Testing pairs")
     if pairs_to_csv:
         pairs = [(gr.node_list[i], gr.node_list[j]) for i in range(len(gr.node_list)) for j in range(i+1, len(gr.node_list))]
+        np.random.shuffle(pairs)
     else:
         pairs = np.random.choice(gr.node_list, size=(config["routing_num_samples"], 2))
     for name, heuristic in heuristics.items():
@@ -264,7 +281,7 @@ def test_routing_pairs(config, gr, heuristics, pairs_to_csv, alpha=2):
             run_astar(gr, pairs, alpha=alpha)
         print()
 
-def generate_routing_plots(config, gr, heuristics, source=None, target=None, min_dist=5000):
+def generate_routing_plots(config, gr, heuristics, source=None, target=None, min_dist=5000, alpha=2):
     print("Generating plots")
     file_name = data_helper.get_file_name(config)
     plot_path = config["graph"]["plot_path"].format(name=file_name)
@@ -288,7 +305,7 @@ def generate_routing_plots(config, gr, heuristics, source=None, target=None, min
         print("A* with {} heuristic".format(name))
         gr.distances = {}
         gr.heuristic = heuristic
-        plot_route(gr, plot_path+"-A*_"+name+".png", source, target)
+        plot_route(gr, plot_path+"-A*_"+name+".png", source, target, alpha=alpha)
         print()
         
 def run_routing_model(config, nx_graph, embedding, model, test_pairs=True, plot_route=True, run_dijkstra=True, run_dist=True):
@@ -457,8 +474,9 @@ def run_routing_dist_matrix(config, nx_graph, matrix, test_pairs=True, plot_rout
     if test_pairs:
         test_routing_pairs(config, gr, heuristics, pairs_to_csv, alpha=1000)
     if plot_route:
-        generate_routing_plots(config, gr, heuristics, source=source, target=target)
+        generate_routing_plots(config, gr, heuristics, source=source, target=target, alpha=1000)
 
     if run_dist:
         print("Average Distance Heuristic:", sum(real_distances) / len(real_distances))
     print("Average True Distance:", sum(true_distances) / len(true_distances))
+    print()

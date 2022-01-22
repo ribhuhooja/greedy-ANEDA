@@ -1,5 +1,6 @@
 from heapq import heappush, heappop
 from itertools import count
+import numpy as np
 
 
 class GraphRouter():
@@ -14,7 +15,8 @@ class GraphRouter():
     # if the entry is not present, it needs to be calculated at runtime. can be saved between runs
     # Not used for now
     def get_dist(self, u, v):
-        pair_key = tuple(sorted([u, v]))
+        pair_key = (u, v)
+        # pair_key = tuple(sorted([u, v]))
         if pair_key in self.distances:
             dist = self.distances[pair_key]
         else:
@@ -176,8 +178,6 @@ class GraphRouter():
             explored[curnode] = parent
 
             for neighbor, w in self.graph[curnode].items():
-                if neighbor == 9291948662:
-                    print(curnode)
                 ncost = dist + w[0]["length"]# weight(curnode, neighbor, w)
                 if neighbor in enqueued:
                     qcost, h = enqueued[neighbor]
@@ -191,8 +191,9 @@ class GraphRouter():
                     h = self.get_dist(neighbor, target)
                     # h = self.heuristic(neighbor, target)
                     # print("       " + str(h))
-                enqueued[neighbor] = ncost, h
-                push(queue, (ncost + alpha*h, next(c), neighbor, ncost, curnode))
+                if h != np.inf:
+                    enqueued[neighbor] = ncost, h
+                    push(queue, (ncost + alpha*h, next(c), neighbor, ncost, curnode))
 
         return None
         # raise nx.NetworkXNoPath(f"Node {target} not reachable from {source}")
