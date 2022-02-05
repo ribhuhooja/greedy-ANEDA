@@ -43,7 +43,17 @@ def hyperbolic_distance(lat_a, long_a, lat_b, long_b):
     lat_a, long_a, lat_b, long_b = lat_a*p, long_a*p, lat_b*p, long_b*p
     vec_a = r*np.hstack((np.cos(lat_a)*np.cos(long_a), np.cos(lat_a)*np.sin(long_a), np.sin(lat_a)))
     vec_b = r*np.hstack((np.cos(lat_b)*np.cos(long_b), np.cos(lat_b)*np.sin(long_b), np.sin(lat_b)))
-    delta = np.dot(vec_b-vec_a, vec_b-vec_a)/((1-np.dot(vec_a, vec_a))*(1-np.dot(vec_b, vec_b)))
+    delta = np.linalg.norm(vec_b-vec_a)**2/((1-np.linalg.norm(vec_a)**2)*(1-np.linalg.norm(vec_b)**2))
+    return R*np.arccosh(1+2*delta)
+
+def hyperbolic_distance2(lat_a, long_a, lat_b, long_b):
+    R = 6731000
+    r = np.sqrt(2)-1# 1-1/np.sqrt(R)
+    p = np.pi/180
+    lat_a, long_a, lat_b, long_b = lat_a*p, long_a*p, lat_b*p, long_b*p
+    vec_a = r*np.hstack((np.cos(lat_a)*np.cos(long_a), np.cos(lat_a)*np.sin(long_a), np.sin(lat_a)))
+    vec_b = r*np.hstack((np.cos(lat_b)*np.cos(long_b), np.cos(lat_b)*np.sin(long_b), np.sin(lat_b)))
+    delta = np.linalg.norm(vec_b-vec_a, ord=3)**3/((1-r**3)*(1-r**3))
     return R*np.arccosh(1+2*delta)
 
 def test(G, G2):
@@ -51,14 +61,13 @@ def test(G, G2):
     lat_a, long_a, lat_b, long_b = G.nodes[a]['y'], G.nodes[a]['x'], G2.nodes[b]['y'], G2.nodes[b]['x']
     real_dist = real_distance(lat_a, long_a, lat_b, long_b)
     print(real_dist)
-    distance_functions = [("approx", approx_distance), ("vector", vector_distance), ("vector2", vector_distance1), ("hyperbolic", hyperbolic_distance)]
+    distance_functions = [("approx", approx_distance), ("vector", vector_distance), ("vector2", vector_distance1), ("hyperbolic", hyperbolic_distance), ("hyperbolic2", hyperbolic_distance2)]
     for name, dist_func in distance_functions:
         dist = dist_func(lat_a, long_a, lat_b, long_b)
         print(name, dist, dist-real_dist)
 
 G = download_networkx_graph("cambridge ma", "drive")
 G2 = download_networkx_graph("waltham ma", "drive")
-# G2 = download_networkx_graph("cambridge", "drive")
 # G3 = download_networkx_graph("Zhouzhuang", "drive")
 test(G, G)
 print()

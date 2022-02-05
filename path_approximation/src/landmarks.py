@@ -79,7 +79,7 @@ def get_landmark_nodes(num_landmarks: int, graph: nx.Graph, random_seed: int = N
     return landmark_nodes
 
 
-def calculate_landmarks_distance(landmark_nodes: List, graph: nx.Graph, output_path: str):
+def calculate_landmarks_distance(config, landmark_nodes: List, graph: nx.Graph, output_path: str):
     """
     Calculate the distance between each landmark node `l` to a node `n` in the graph
     :param landmark_nodes:
@@ -89,12 +89,15 @@ def calculate_landmarks_distance(landmark_nodes: List, graph: nx.Graph, output_p
     """
 
     distance_map = {}
+    weight = "length" if config["graph"]["source"] == "osmnx" or config["graph"]["source"] == "osmnx" else None
     for landmark in tqdm(landmark_nodes):
         distances = {}
-        node_dists = nx.shortest_path_length(G=graph, source=landmark, weight="length")
+        node_dists = nx.shortest_path_length(G=graph, source=landmark, weight=weight)
         for node_n, dist_to_n in node_dists.items():
             # put distance in kilometers to make training faster
-            distances[node_n] = dist_to_n / 1000
+            if config["graph"]["source"] == "osmnx" or config["graph"]["source"] == "osmnx":
+                dist_to_n = dist_to_n / 1000
+            distances[node_n] = dist_to_n
 
         distance_map[landmark] = distances.copy()
 

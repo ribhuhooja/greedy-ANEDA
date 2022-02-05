@@ -1,6 +1,7 @@
 import json
 import os
 from collections import Counter
+from platform import node
 from typing import Dict
 import yaml
 
@@ -9,6 +10,7 @@ import networkx as nx
 import osmnx as ox
 
 import numpy as np
+import pandas as pd
 import scipy
 import dill
 import torch
@@ -112,16 +114,30 @@ def load_gr_file_to_dgl_graph(path: str, undirected: bool, c_path=""):
 
     return g
 
-def load_dgl_graph(path, undirected: bool, edge_weights=None, d_path=""):
+def load_dgl_graph(path, undirected: bool, edge_weights=None, c_path=""):
     """
     Loads dgl graph from file in either edgelist or gr format
     """
     if ".edgelist" in path:
         return load_edgelist_file_to_dgl_graph(path, undirected, edge_weights)
     elif ".gr" in path:
-        return load_gr_file_to_dgl_graph(path, undirected, d_path)
+        return load_gr_file_to_dgl_graph(path, undirected, c_path)
     else:
         raise ValueError('Unknown file type. Must be either .edgelist or .gr')
+
+def load_gis_f2e_to_nx_graph(path: str):
+    df = pd.read_csv(path)
+    print("MAX_WEIGHT", df["LENGTH"].max())
+    df["length"] = df["LENGTH"] / df["LENGTH"].max()
+    nx_graph = nx.from_pandas_edgelist(df, source="START_NODE", target="END_NODE", create_using=nx.MultiDiGraph, edge_attr=["length"])
+
+    df.drop_duplicates("START_NODE")
+    df["XCoord"] = (df["XCoord"]-df["XCoord"].min())/(df["XCoord"].max()-df["XCoord"].min())
+    df["YCoord"] = (df["YCoord"]-df["YCoord"].min())/(df["YCoord"].max()-df["YCoord"].min())
+    coords = {row["START_NODE"] : {'x': row["XCoord"], 'y': row["YCoord"]} for _, row in df.iterrows()}
+    nx.set_node_attributes(nx_graph, coords)
+
+    return nx_graph
 
 def download_networkx_graph(query, type, path=""):
     """
@@ -134,6 +150,18 @@ def download_networkx_graph(query, type, path=""):
         G = nx.read_gpickle(path)
     else:
         G = ox.graph_from_place(query, network_type=type)
+        max_weight = 0
+        weights = []
+        for u,v,d in G.edges(data=True):
+            weights.append(d['length'])
+            max_weight = max(max_weight, d['length'])
+        print("MAX WEIGHT:", max_weight)
+        print("AVG ORIGINAL WEIGHT:", sum(weights)/len(weights))
+        weights = []
+        for u,v,d in G.edges(data=True):
+            d['length'] = d['length']/max_weight
+            weights.append(d['length'])
+        print("AVG NEW WEIGHT:", sum(weights)/len(weights))
         nx.write_gpickle(G, path)
     print("Num Nodes: {}".format(G.number_of_nodes()))
     print("Num Edges: {}".format(G.number_of_edges()))
@@ -246,14 +274,20 @@ def get_file_name(config):
     #     file_name = "modified_"+file_name
     return file_name
 
-def get_coord_embedding(nx_graph, node_list):
-    R = 6731
+def get_coord_embedding(config, nx_graph, node_list):
+    R = 1 #6731
     p = np.pi/180
-    embedding = np.zeros((len(node_list), 3))
+    dim = 2 if config["graph"]["source"] == "gis-f2e" or config["collab_filtering"]["measure"] == "lat-long" else 3   
+    embedding = np.zeros((len(node_list), dim))
     for i,node in enumerate(node_list):
-        lat, long  = nx_graph.nodes[node]['y']*p, nx_graph.nodes[node]['x']*p
-        vec = R*np.hstack((np.cos(lat)*np.cos(long), np.cos(lat)*np.sin(long), np.sin(lat)))
-        embedding[i] = vec
+        if config["graph"]["source"] == "gis-f2e":
+            embedding[i] = np.asarray([nx_graph.nodes[node]['x'], nx_graph.nodes[node]['y']])
+        else:
+            lat, long  = nx_graph.nodes[node]['y']*p, nx_graph.nodes[node]['x']*p
+            if config["collab_filtering"]["measure"] == "lat-long":
+                embedding[i] = np.asarray([lat, long])
+            else:
+                embedding[i] = R*np.hstack((np.cos(lat)*np.cos(long), np.cos(lat)*np.sin(long), np.sin(lat)))
     return embedding
 
 def get_dist_matrix(nx_graph, node_list, node2idx):

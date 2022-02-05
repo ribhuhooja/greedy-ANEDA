@@ -1,4 +1,5 @@
 import os.path
+from turtle import distance
 
 import dgl
 from sklearn.model_selection import train_test_split
@@ -81,7 +82,7 @@ def create_train_val_test_sets(config, nx_graph, embedding, mode):
     # Get landmarks' distance: get distance of every pair (l,n), where l is a landmark node, n is a node in the graph
     landmark_distance_output_path = config["dataset"]["landmark_distance_output_path"].format(name=file_name)
     print("Calculating landmarks distance...")
-    distance_map = landmarks.calculate_landmarks_distance(landmark_nodes, nx_graph, 
+    distance_map = landmarks.calculate_landmarks_distance(config, landmark_nodes, nx_graph, 
                                                           output_path=landmark_distance_output_path)
     print("Done landmarks distance!")
 
@@ -160,18 +161,22 @@ def create_coord_dataset(config, nx_graph, node_list, node2idx):
 
 #     return torch.tensor(dataset)
 
-def create_collab_filtering_dataset(nx_graph, sample_ratio, node_list, node2idx):
+def create_collab_filtering_dataset(config, nx_graph, sample_ratio, node_list, node2idx):
     sources = np.random.choice(node_list, int(len(node_list) * sample_ratio), replace=False)
+    node_list = set(node_list)
     dataset_map = {}
+    weight = "length" if config["graph"]["source"] == "osmnx" or config["graph"]["source"] == "gis-f2e" else None
     for source in tqdm(sources):
-        node_dists = nx.shortest_path_length(G=nx_graph, source=source, weight="length")
+        node_dists = nx.shortest_path_length(G=nx_graph, source=source, weight=weight)
         for node_n, dist_to_n in node_dists.items():
-            if (source, node_n) not in dataset_map or dist_to_n < dataset_map[(source, node_n)]:
-                dataset_map[(source, node_n)] = dist_to_n
+            # if not config["rizi_train"] or (node_n in node_list and dist_to_n > 1 and dist_to_n <= 5):
+            if node_n != source and ((source, node_n) not in dataset_map or dist_to_n < dataset_map[(source, node_n)]):
+                dataset_map[(source, node_n)] = np.double(dist_to_n)
             
-    # put distance in kilometers to make training faster
     dataset = []
     for (source, node_n), dist_to_n in tqdm(dataset_map.items()):
-        dataset.append([node2idx[source], node2idx[node_n], dist_to_n / 1000])
+        # if config["graph"]["source"] == "osmnx" or config["graph"]["source"] == "gis-f2e":
+        #     dist_to_n = dist_to_n / 1000
+        dataset.append([node2idx[source], node2idx[node_n], dist_to_n])
 
-    return torch.tensor(dataset)
+    return torch.tensor(dataset), sources

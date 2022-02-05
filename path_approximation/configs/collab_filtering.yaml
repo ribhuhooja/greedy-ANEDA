@@ -3,23 +3,28 @@
 ## For tuning parameters, set `value` as a list (e.g.,  if we set `sample_method: ['random', 'high_degree', 'high_and_low_degree']`, we will generate 3 different configs)
 random_seed: 42
 graph:
-  source: "osmnx" # "edgelist", "gr"
-  name: "hartford" # USA-road-t.NY
+  source: "osmnx" # "osmnx", "edgelist", "gr", "gis-f2e"
+  name: "hartford" # "Winterthur, Switzerland"
   file_path: "../data/{name}.{source}"
   download_type: "drive"
   coord_path: "../data/{name}.co"
   plot_path: "../plots/{name}"
 collab_filtering:
-  "device": "cuda:6"
-  "embedding_dim": 40
-  "batch_size": 73226 # 1024
+  "device": "cuda:0"
+  "embedding_dim": 128
+  "batch_size": 0 # 30229 # 73179 # 1024
   "epochs": 1000
-  "lr": 0.0001 # 0.0002
+  "lr": 0.01
+  "loss_func": "poisson" # "mre", "mse", "poisson"
+  "optimizer": "adam" # "adam", "sgd"
+  "init_embedding": "coord" # "coord" "node2vec" "grarep" "none"
+  "measure": "norm" # "norm" "spherical" "hyperbolic" "lat-long" "inv-dot"
+  "norm": 6
   "sample_ratio": 0.03
-  "hyperbolic": True
-# Epoch: 1, Train Loss: -2.1565
-# Epoch: 2, Train Loss: -2.1748
-# Epoch: 150, Train Loss: -2.2214
+  "test_sample_ratio": 0.1
+run_routing: True
+rizi_train: False
+
 plot:
   plot_nx_graph: False
 val_size: 0.2 # val/train = 20% / 80%, for training
@@ -31,3 +36,29 @@ write_test_set: True
 parse_tuning_param_by: ->  ## helpful to create a list of configs
 routing_num_samples: 25000
 # df = pd.read_csv("routes.csv", names=["source", "target", "numVisited", "pathLength"])
+node2vec:
+  "device": cuda
+  "embedding_dim": 128
+  "walk_length": 80
+  "window_size": 5
+  "p": 1
+  "q": 1
+  "num_walks": 10
+  "epochs": 100
+  "batch_size": 256
+  "lr": 0.01
+# node2vec:
+#   "device": cuda
+#   "embedding_dim": 128
+#   "walk_length": 80
+#   "window_size": 10
+#   "p": 1
+#   "q": 1
+#   "num_walks": 10
+#   "epochs": 100
+#   "batch_size": 256
+#   "lr": 0.02
+grarep:
+  "embedding_dim": 128
+  "iterations": 10
+  "order": 100

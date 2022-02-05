@@ -4,10 +4,11 @@ import numpy as np
 
 
 class GraphRouter():
-    def __init__(self, graph, heuristic=lambda u, v: 0):
+    def __init__(self, graph, heuristic=lambda u, v: 0, is_symmetric=True):
         self.graph = graph
         self.heuristic = heuristic
         self.distances = {}
+        self.is_symmetric = is_symmetric
         self.node_list = list(self.graph.nodes())
         self.node_to_idx = {v: i for i,v in enumerate(self.node_list)}
 
@@ -15,7 +16,10 @@ class GraphRouter():
     # if the entry is not present, it needs to be calculated at runtime. can be saved between runs
     # Not used for now
     def get_dist(self, u, v):
-        pair_key = (u, v)
+        if self.is_symmetric:
+            pair_key = tuple(sorted([u, v]))
+        else:
+            pair_key = (u, v)
         # pair_key = tuple(sorted([u, v]))
         if pair_key in self.distances:
             dist = self.distances[pair_key]

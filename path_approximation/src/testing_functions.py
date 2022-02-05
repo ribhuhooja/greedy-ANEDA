@@ -10,7 +10,7 @@ from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
 from sklearn.metrics import accuracy_score, mean_absolute_error, mean_squared_error, mean_absolute_percentage_error
 from torch import tensor, reshape
-import dgl
+import networkx as nx
 import osmnx as ox
 
 import models
@@ -161,6 +161,16 @@ def run_linear_model_with_under_and_over_sampling(file_name, force_recreate_data
 
     return True
 
+def report_percentiles(df, field):
+    pd.set_option('display.float_format', lambda x: '%.4f' % x)
+    print(df.describe())
+    print("90th")
+    print(df.nlargest(len(df)//10, field).iloc[-1])
+    print("95th")
+    print(df.nlargest(len(df)//20, field).iloc[-1])
+    print("99th")
+    print(df.nlargest(len(df)//100, field).iloc[-1])
+
 def run_astar(gr, pairs, alpha=2):
     sum_visited = 0
     max_visited = 0
@@ -185,41 +195,54 @@ def run_astar(gr, pairs, alpha=2):
     print("Max Unnecessary Visits:", max_visited, max_length, max_pair)
     return sum_visited / len(pairs), max_visited
 
-def run_astar_csv(config, name, gr, pairs, alpha=2):
+def run_astar_csv(config, name, gr, pairs, alpha=2, report_stretch=False):
     file_name = data_helper.get_file_name(config)
     routes = []
+    stretches = []
+    for i in tqdm(range(len(pairs))):
+        if report_stretch:
+            u, v, true_dist = pairs[i]
+        else:
+            u, v = pairs[i]
+        result = gr.astar(u, v, alpha=alpha)
+        if result != None:
+            path, num_visited, visited = result
+            routes.append([u, v, num_visited, len(path), len(set(visited))])
+            if report_stretch:
+                path_dist = 0
+                for i in range(1, len(path)):
+                    path_dist += gr.graph.edges[path[i-1], path[i], 0]['length']
+                stretches.append([u, v, path_dist, true_dist])
+
     columns = ["source", "target", "numVisited", "pathLength", "uniqueVisited"]
     if name == "embedding":
-        csv_path = "../output/routes/{}/embedding-routes-ratio{}-dim{}{}.csv".format(file_name, config["collab_filtering"]["sample_ratio"], config["collab_filtering"]["embedding_dim"], "-h" if config["collab_filtering"]["hyperbolic"] else "")
+        csv_path = "../output/routes/{}/embedding-routes-ratio{}-dim{}{}.csv".format(file_name, config["collab_filtering"]["sample_ratio"], config["collab_filtering"]["embedding_dim"], "-"+config["collab_filtering"]["measure"] if config["collab_filtering"]["measure"] != "norm" else "")
+        stretch_path = "../output/routes/{}/embedding-stretches-ratio{}-dim{}{}.csv".format(file_name, config["collab_filtering"]["sample_ratio"], config["collab_filtering"]["embedding_dim"], "-"+config["collab_filtering"]["measure"] if config["collab_filtering"]["measure"] != "norm" else "")
     else:
         csv_path = "../output/routes/{}/{}-routes.csv".format(file_name, name)
-    with open(csv_path, 'w') as f:
-        csvwriter = csv.writer(f)
-        csvwriter.writerow(columns)
-        for i in tqdm(range(len(pairs))):
-            u, v = pairs[i]
-            result = gr.astar(u, v, alpha=alpha)
-            if result != None:
-                path, num_visited, visited = result
-                routes.append([u, v, num_visited, len(path), len(set(visited))])
-                csvwriter.writerow(routes[-1])
+        stretch_path = "../output/routes/{}/{}-stretches.csv".format(file_name, name)
+
     df = pd.DataFrame(routes, columns=columns)
-    df['performance'] = df['numVisited'] / df['pathLength']
-    df['performance2'] = 1-df['pathLength']/df['numVisited']
-    pd.set_option('display.float_format', lambda x: '%.4f' % x)
-    print(df.describe())
-    print("90th")
-    print(df.nlargest(len(df)//10, 'performance').iloc[-1])
-    print("95th")
-    print(df.nlargest(len(df)//20, 'performance').iloc[-1])
-    print("99th")
-    print(df.nlargest(len(df)//100, 'performance').iloc[-1])
-      
+    df['performance'] = 1-df['pathLength']/df['numVisited']
+    report_percentiles(df, 'performance')
+    df.to_csv(csv_path)
+    
+    if report_stretch:
+        columns = ["source", "target", "stretch"]
+        if name == "embedding":
+            stretch_path = "../output/routes/{}/embedding-stretches-ratio{}-dim{}{}.csv".format(file_name, config["collab_filtering"]["sample_ratio"], config["collab_filtering"]["embedding_dim"], "-"+config["collab_filtering"]["measure"] if config["collab_filtering"]["measure"] != "norm" else "")
+        else:
+            stretch_path = "../output/routes/{}/{}-stretches.csv".format(file_name, name)
+        df = pd.DataFrame(stretches, columns=["source", "target", "pathDistance", "trueDistance"])
+        df["stretch"] = df["pathDistance"] / df["trueDistance"]
+        report_percentiles(df, 'stretch')
+        df.to_csv(stretch_path)      
 
 def plot_route(gr, f_name, u, v, alpha=2):
     G = gr.graph
 
     route, num_visited, visited = gr.astar(u, v, weight="length", alpha=alpha)
+    print(visited[:5], visited[-5:])
     path_length = 0
     for i in range(1, len(route)):
         path_length += G.edges[route[i-1], route[i], 0]['length']
@@ -235,7 +258,8 @@ def plot_route(gr, f_name, u, v, alpha=2):
         if length_runner >= path_length // 2:
             mid_node = route[i-1]
             break
-    bbox = ox.utils_geo.bbox_from_point((G.nodes[mid_node]['y'], G.nodes[mid_node]['x']), dist=path_length/2)
+    print(path_length/2)
+    bbox = ox.utils_geo.bbox_from_point((G.nodes[mid_node]['y'], G.nodes[mid_node]['x']), dist=750)
 
     visited_nodes = {}
     for node in visited:
@@ -264,19 +288,37 @@ def plot_route(gr, f_name, u, v, alpha=2):
     fig, ax = ox.plot.plot_graph_route(G, route, route_color='red', ax=ax)
     fig.savefig(f_name)
 
-def test_routing_pairs(config, gr, heuristics, pairs_to_csv, alpha=2):
-    print("Testing pairs")
+def test_routing_pairs(config, gr, heuristics, pairs_to_csv, alpha=2, report_stretch=False):
     if pairs_to_csv:
-        pairs = [(gr.node_list[i], gr.node_list[j]) for i in range(len(gr.node_list)) for j in range(i+1, len(gr.node_list))]
-        np.random.shuffle(pairs)
+        if report_stretch:
+            file_name = data_helper.get_file_name(config)
+            print("Retrieving true distances for {}".format(file_name))
+            path = "../output/routes/{}/true-distances.csv".format(file_name)
+            if os.path.isfile(path):
+                print("Reading back distances")
+                pairs = pd.read_csv(path).drop(columns=["Unnamed: 0"]).to_numpy()
+            else:
+                dist_map = {}
+                for source in tqdm(gr.node_list):
+                    dist_map[source] = nx.shortest_path_length(G=gr.graph, source=source, weight="length")
+                pairs = [[u, v, dist] for u in dist_map.keys() for v, dist in dist_map[u].items() if u < v]
+                np.random.shuffle(pairs)
+                pd.DataFrame(pairs, columns=["source", "target", "dist"]).to_csv(path)
+
+            print("Done retrieving distances")
+        else:
+            pairs = [(gr.node_list[i], gr.node_list[j]) for i in range(len(gr.node_list)) for j in range(i+1, len(gr.node_list))]
+            np.random.shuffle(pairs)
     else:
         pairs = np.random.choice(gr.node_list, size=(config["routing_num_samples"], 2))
+
+    print("Testing pairs")
     for name, heuristic in heuristics.items():
         print("A* with {} heuristic".format(name))
         gr.heuristic = heuristic
         gr.distances = {}
         if pairs_to_csv:
-            run_astar_csv(config, name, gr, pairs, alpha=alpha)
+            run_astar_csv(config, name, gr, pairs, alpha=alpha, report_stretch=report_stretch)
         else:
             run_astar(gr, pairs, alpha=alpha)
         print()
@@ -347,13 +389,14 @@ def run_routing_model(config, nx_graph, embedding, model, test_pairs=True, plot_
         print("Average Distance Heuristic:", sum(real_distances) / len(real_distances))
     print("Average Model Heuristic:", sum(model_distances) / len(model_distances))
   
-def run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_route=True, run_dijkstra=True, run_dist=True, pairs_to_csv=False, source=None, target=None):
+def run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_route=True, run_dijkstra=True, run_dist=True, pairs_to_csv=False, alpha=2, source=None, target=None, report_stretch=False):
     """
     Run routing algorithm on given graph with given heuristic and landmark method
     :param config: provide all we need in terms of parameters
     :return: ?
     """
-    gr = GraphRouter(graph=nx_graph)
+    gr = GraphRouter(graph=nx_graph, is_symmetric=pairs_to_csv)
+    norm = config["collab_filtering"]["norm"]
     
     real_distances = []
     def dist_heuristic(a, b):
@@ -367,10 +410,39 @@ def run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_rou
         return D
 
     emb_distances = []
+    nodes = []
     def embedding_heuristic(x,y):
         x, y = gr.node_to_idx[x], gr.node_to_idx[y]
         a, b = embedding[x], embedding[y]
-        D = 1000*np.linalg.norm(a-b)
+        D = 1000*np.linalg.norm(a-b, ord=norm)
+        emb_distances.append(D)
+        return D
+    def hyperbolic_embedding_heuristic(x, y):
+        R = 6731000
+        u, v = gr.node_to_idx[x], gr.node_to_idx[y]
+        a, b = embedding[u], embedding[v]
+        euclid_dist = np.linalg.norm(a-b, ord=norm)
+        left_norm = np.linalg.norm(a, ord=norm)
+        right_norm = np.linalg.norm(b, ord=norm)
+        delta = np.divide(euclid_dist**2, (1-left_norm**2)*(1-right_norm**2))
+        D = R*np.arccosh(1+2*delta)
+        nodes.append(x)
+        emb_distances.append(D)
+        return D
+    def spherical_embedding_heuristic(x,y):
+        R = 6731000
+        x, y = gr.node_to_idx[x], gr.node_to_idx[y]
+        a, b = embedding[x], embedding[y]
+        np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+        D = R*np.linalg.norm(a-b, ord=norm)
+        emb_distances.append(D)
+        return D
+    def latlong_embedding_heuristic(x,y):
+        R = 6731000
+        x, y = gr.node_to_idx[x], gr.node_to_idx[y]
+        a, b = embedding[x], embedding[y]
+        d = 0.5 - np.cos(b[0]-a[0])/2 + np.cos(a[0])*np.cos(b[0]) * (1-np.cos(b[1]-a[1]))/2
+        D = 2*R*np.arcsin(np.sqrt(d))
         emb_distances.append(D)
         return D
 
@@ -379,13 +451,22 @@ def run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_rou
         heuristics["dijkstra"] = gr.heuristic
     if run_dist:
         heuristics["distance"] = dist_heuristic
-    heuristics["embedding"] = embedding_heuristic
 
+    if config["collab_filtering"]["measure"] == "norm":
+        heuristics["embedding"] = embedding_heuristic
+    elif config["collab_filtering"]["measure"] == "hyperbolic":
+        heuristics["embedding"] = hyperbolic_embedding_heuristic
+    elif config["collab_filtering"]["measure"] == "spherical": # spherical
+        heuristics["embedding"] = spherical_embedding_heuristic
+    else:
+        heuristics["embedding"] = latlong_embedding_heuristic
     if test_pairs:
-        test_routing_pairs(config, gr, heuristics, pairs_to_csv)
+        test_routing_pairs(config, gr, heuristics, pairs_to_csv, alpha, report_stretch)
     if plot_route:
         generate_routing_plots(config, gr, heuristics, source=source, target=target)
 
+    # print(nodes[:10], emb_distances[:10])
+    # print(nodes[-10:], emb_distances[-10:])
     if run_dist:
         print("Average Distance Heuristic:", sum(real_distances) / len(real_distances))
     print("Average Embedding Heuristic:", sum(emb_distances) / len(emb_distances))
