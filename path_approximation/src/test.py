@@ -1,3 +1,4 @@
+from cgi import test
 from distutils.file_util import write_file
 import logging
 import os.path
@@ -91,32 +92,35 @@ if __name__ == '__main__':
                                                                             measure="-"+collab_filtering_args["measure"] if collab_filtering_args["measure"] != "norm" else "",
                                                                             norm="-p"+str(collab_filtering_args["norm"]) if collab_filtering_args["measure"] == "norm" and collab_filtering_args["norm"] != 2 else "",
                                                                             embedding=("-"+collab_filtering_args["init_embedding"]+(str(config["grarep"]["order"]) if collab_filtering_args["init_embedding"] == "grarep" else "")) if collab_filtering_args["init_embedding"] != "coord" else "")
+        #### Step 2. Create datasets
+        print("Creating dataset")
+        dataset_output_path = "../output/datasets/collab_filtering_{}_ratio-{}".format(file_name, collab_filtering_args["sample_ratio"])
+        test_dataset_output_path = "../output/datasets/collab_filtering_test_{}_ratio-{}".format(file_name, collab_filtering_args["test_sample_ratio"])
+
+        if os.path.isfile(dataset_output_path) and os.path.isfile(test_dataset_output_path):
+            collab_filtering_dataset = data_helper.read_file(dataset_output_path)
+            test_dataset = data_helper.read_file(test_dataset_output_path)
+
+            collab_filtering_dataset = collab_filtering_dataset[collab_filtering_dataset[:, 0] != collab_filtering_dataset[:, 1]]
+            test_dataset = test_dataset[test_dataset[:, 0] != test_dataset[:, 1]]
+            print(f"Dataset already exists! Read back from {dataset_output_path}")
+        else:
+            assert collab_filtering_args["sample_ratio"] + collab_filtering_args["test_sample_ratio"] <= 1
+            collab_filtering_dataset, sources = create_collab_filtering_dataset(config, nx_graph, collab_filtering_args["sample_ratio"], node_list, node2idx)
+            rem_node_list = np.setdiff1d(node_list, sources)
+            if collab_filtering_args["sample_ratio"] == 1:
+                test_dataset = torch.clone(collab_filtering_dataset)
+            else:
+                test_dataset, _ = create_collab_filtering_dataset(config, nx_graph, collab_filtering_args["test_sample_ratio"]/(1-collab_filtering_args["sample_ratio"]), rem_node_list, node2idx)
+            data_helper.write_file(dataset_output_path, collab_filtering_dataset)
+            data_helper.write_file(test_dataset_output_path, test_dataset)
+        print("Finished dataset. Size:", len(collab_filtering_dataset), ",", len(test_dataset))
+
+        
         if os.path.isfile(embedding_output_path):
             embedding = data_helper.read_file(embedding_output_path)
             print(f"Embedding already exists! Read back from {embedding_output_path}")
         else:
-            #### Step 2. Create datasets
-            print("Creating dataset")
-            dataset_output_path = "../output/datasets/collab_filtering_{}_ratio-{}".format(file_name, collab_filtering_args["sample_ratio"])
-            test_dataset_output_path = "../output/datasets/collab_filtering_test_{}_ratio-{}".format(file_name, collab_filtering_args["test_sample_ratio"])
-
-            if os.path.isfile(dataset_output_path) and os.path.isfile(test_dataset_output_path):
-                collab_filtering_dataset = data_helper.read_file(dataset_output_path)
-                test_dataset = data_helper.read_file(test_dataset_output_path)
-
-                collab_filtering_dataset = collab_filtering_dataset[collab_filtering_dataset[:, 0] != collab_filtering_dataset[:, 1]]
-                test_dataset = test_dataset[test_dataset[:, 0] != test_dataset[:, 1]]
-                print(f"Dataset already exists! Read back from {dataset_output_path}")
-            else:
-                assert collab_filtering_args["sample_ratio"] + collab_filtering_args["test_sample_ratio"] <= 1
-                collab_filtering_dataset, sources = create_collab_filtering_dataset(config, nx_graph, collab_filtering_args["sample_ratio"], node_list, node2idx)
-                rem_node_list = np.setdiff1d(node_list, sources)
-                test_dataset, _ = create_collab_filtering_dataset(config, nx_graph, collab_filtering_args["test_sample_ratio"]/(1-collab_filtering_args["sample_ratio"]), rem_node_list, node2idx)
-                data_helper.write_file(dataset_output_path, collab_filtering_dataset)
-                data_helper.write_file(test_dataset_output_path, test_dataset)
-            print("Finished dataset. Size:", len(collab_filtering_dataset), ",", len(test_dataset))
-
-
             #### Step 3. Get initial vectors from graph
             full_init_embedding = np.random.normal(scale=1/collab_filtering_args["embedding_dim"], size=(len(nx_graph.nodes), collab_filtering_args["embedding_dim"]))
             h = 1.1
@@ -176,6 +180,9 @@ if __name__ == '__main__':
             #### Step 4. Run collaborative filtering
             embedding = collaborative_filtering.run_collab_filtering(collab_filtering_dataset, len(nx_graph.nodes), init_embeddings=full_init_embedding, eval_set=test_dataset, args=collab_filtering_args, output_path=embedding_output_path, config=config)
         print(f"Done embedding {file_name}!")
+
+        test_metrics = collaborative_filtering.test_collab_filtering(config, embedding, test_dataset)
+        print("Final Results: {}".format(test_metrics))
 
         #### Step 5. Run routing
         # Generate all route pairs for Belmont CA to output complete performance percentiles

@@ -11,6 +11,45 @@ from torch.utils.data import DataLoader
 from data_helper import write_file
 from evaluations import evaluate_metrics
 
+def get_distance(left_emb, right_emb, measure, norm=2, device="cpu"):
+    if measure == "norm":
+        # left_emb = left_emb.unsqueeze(dim=1)
+        # right_emb = right_emb.unsqueeze(dim=1)
+        dist_hat = torch.linalg.norm(left_emb-right_emb, ord=norm, dim=1) # torch.cdist(left_emb, right_emb, p=self.norm).view(-1)
+    elif measure == "hyperbolic":
+        # left_right_norm = torch.linalg.norm(left_emb-right_emb, dim=1) # torch.cdist(left_emb, right_emb).view(-1)
+        # left_norm = torch.linalg.norm(left_emb, dim=1) # torch.cdist(left_emb, left_emb).view(-1)
+        # right_norm = torch.linalg.norm(right_emb, dim=1) # torch.cdist(right_emb, right_emb).view(-1)
+        # delta = torch.div(left_right_norm**2, (1-left_norm**2)*(1-right_norm**2))
+        # dist_hat = R*torch.arccosh(1+2*delta)
+        ones = torch.ones(len(left_emb)).to(device)
+        left_bias = (ones + torch.linalg.norm(left_emb, dim=1)**2)**1/2
+        right_bias = (ones + torch.linalg.norm(right_emb, dim=1)**2)**1/2
+        mink_prod = left_bias*right_bias - torch.sum(left_emb*right_emb, dim=1)
+        dist_hat = torch.arccosh(torch.maximum(mink_prod, ones))
+    elif measure == "spherical":
+        dot = torch.sum(left_emb*right_emb, dim=1)
+        left_norm = torch.linalg.norm(left_emb, dim=1)
+        right_norm = torch.linalg.norm(right_emb, dim=1)
+        # Clamp values to prevent floating point error, which results in nan after arccos
+        div = torch.clamp(torch.div(dot, left_norm * right_norm), min=-1, max=1)
+        dist_hat = torch.arccos(div) #*(6.99160409516 / (np.pi/2))
+    elif measure == "lat-long":
+        delta = right_emb - left_emb
+        d = 0.5 - torch.cos(delta[:, 0])/2 + torch.cos(left_emb[:, 0])*torch.cos(right_emb[:, 0]) * (1-torch.cos(delta[:, 1]))/2
+        dist_hat = 2*torch.arcsin(torch.sqrt(d))
+    elif measure == "inv-dot":
+        # dot = torch.sum(left_emb*right_emb, dim=1)
+        # dist_hat = torch.exp(-dot)
+        dot = torch.sum(left_emb*right_emb, dim=1)
+        left_norm = torch.linalg.norm(left_emb, dim=1)
+        right_norm = torch.linalg.norm(right_emb, dim=1)
+        div = torch.clamp(torch.div(dot, left_norm * right_norm), min=-1, max=1)
+        # dist_hat = torch.log(4 / (div+1) - 1)
+        dist_hat = -(div-1)*7/2
+
+    return dist_hat
+
 # https://github.com/dmlc/dgl/tree/e667545da55017d5dbbd3f243d986506284d3e41/examples/pytorch/node2vec
 class CollaborativeFiltering(nn.Module):
     """Node2vec model from paper path_approximation: Scalable Feature Learning for Networks <https://arxiv.org/abs/1607.00653>
@@ -62,10 +101,6 @@ class CollaborativeFiltering(nn.Module):
         assert measure in ["norm", "hyperbolic", "spherical", "lat-long", "inv-dot"]
         self.measure = measure
         self.norm = norm
-        # self.loss_fn = nn.PoissonNLLLoss(log_input=False, eps=1e-07, reduction='mean')
-        # print(self.loss_fn)
-        # max_loss_fn = nn.PoissonNLLLoss(log_input=False, eps=1e-07, reduction='none')
-        # self.max_loss_fn = lambda x, y: torch.mean(torch.topk(y-x, len(x)//100)[0])/100
         
         self.embedding = nn.Embedding(self.N, embedding_dim, sparse=use_sparse)
         print(torch.mean(torch.linalg.norm(init_embeddings, dim=1)))
@@ -74,8 +109,6 @@ class CollaborativeFiltering(nn.Module):
         self.embedding = self.embedding.to(device)
         self.device = device
         print(self.embedding.weight.device)
-
-        self.ones = torch.ones(self.N, 1).to(device)
         
         # def gradInspect(self, input, output):
         #     # grad = input[0].coalesce()
@@ -132,79 +165,8 @@ class CollaborativeFiltering(nn.Module):
         left_emb = self.embedding(left)
         right_emb = self.embedding(right)
 
-        if self.measure == "norm":
-            # left_emb = left_emb.unsqueeze(dim=1)
-            # right_emb = right_emb.unsqueeze(dim=1)
-            dist_hat = torch.linalg.norm(left_emb-right_emb, ord=self.norm, dim=1) # torch.cdist(left_emb, right_emb, p=self.norm).view(-1)
-        elif self.measure == "hyperbolic":
-            R = 1 # 6731
-            # left_right_norm = torch.linalg.norm(left_emb-right_emb, dim=1) # torch.cdist(left_emb, right_emb).view(-1)
-            # left_norm = torch.linalg.norm(left_emb, dim=1) # torch.cdist(left_emb, left_emb).view(-1)
-            # right_norm = torch.linalg.norm(right_emb, dim=1) # torch.cdist(right_emb, right_emb).view(-1)
-            # delta = torch.div(left_right_norm**2, (1-left_norm**2)*(1-right_norm**2))
-            # dist_hat = R*torch.arccosh(1+2*delta)
-
-            # errs = torch.isnan(dist_hat).nonzero(as_tuple=True)[0]
-            # if len(errs) > 0:
-            #     print("tests")
-            #     print(left_norm[0], left_norm[errs[:10]])
-            #     print(right_norm[0], right_norm[errs[:10]])
-            #     print(left_right_norm[0], left_right_norm[errs[:10]])
-            #     print(delta[0], delta[errs[:10]])
-            #     print(dist_hat[0], dist_hat[errs[:10]])
-            #     print()
-            ones = torch.ones(len(left_emb)).to(self.device)
-            left_bias = (ones + torch.linalg.norm(left_emb, dim=1)**2)**1/2
-            right_bias = (ones + torch.linalg.norm(right_emb, dim=1)**2)**1/2
-            mink_prod = left_bias*right_bias - torch.sum(left_emb*right_emb, dim=1)
-            dist_hat = torch.arccosh(torch.maximum(mink_prod, ones))
-            # print(torch.mean(left_bias))
-            # print(torch.mean(mink_prod))
-            # print()
-            # one = torch.tensor(1)
-            # dist_hat = torch.arccosh(torch.max(mink_prod, one))
-            
-            # errs = torch.isnan(dist_hat).nonzero(as_tuple=True)[0]
-            # if len(errs) > 0:
-            #     print("tests")
-            #     print(left_norm[0], left_norm[errs[:10]])
-            #     print(right_norm[0], right_norm[errs[:10]])
-            #     print(left_right_norm[0], left_right_norm[errs[:10]])
-            #     print(delta[0], delta[errs[:10]])
-            #     print(dist_hat[0], dist_hat[errs[:10]])
-            #     print()
-        elif self.measure == "spherical":
-            R = 1 # 6731
-            dot = torch.sum(left_emb*right_emb, dim=1)
-            left_norm = torch.linalg.norm(left_emb, dim=1)
-            right_norm = torch.linalg.norm(right_emb, dim=1)
-            # Clamp values to prevent floating point error, which results in nan after arccos
-            div = torch.clamp(torch.div(dot, left_norm * right_norm), min=-1, max=1)
-            dist_hat = R*torch.arccos(div) 
-        elif self.measure == "lat-long":
-            R = 1 # 6731
-            delta = right_emb - left_emb
-            d = 0.5 - torch.cos(delta[:, 0])/2 + torch.cos(left_emb[:, 0])*torch.cos(right_emb[:, 0]) * (1-torch.cos(delta[:, 1]))/2
-            dist_hat = 2*R*torch.arcsin(torch.sqrt(d))
-        elif self.measure == "inv-dot":
-            dot = torch.sum(left_emb*right_emb, dim=1)
-            dist_hat = torch.exp(-dot)
-
-        # if self.use_hyperbolic:
-        #     R = 6731
-        #     left_norm = torch.cdist(left_emb[:,:,:3], left_emb[:,:,:3]).view(-1) # torch.linalg.norm(left_emb[:, :3], dim=1)
-        #     right_norm = torch.cdist(right_emb[:,:,:3], right_emb[:,:,:3]).view(-1) # torch.linalg.norm(right_emb[:, :3], dim=1) 
-        #     left_right_norm = torch.cdist(left_emb[:,:,:3], right_emb[:,:,:3]).view(-1) # torch.linalg.norm(left_emb[:, :3] - right_emb[:, :3], dim=1)
-        #     delta = torch.div(left_right_norm**2, (1-left_norm**2)*(1-right_norm**2))
-        #     # print(left_emb.size(), left_norm.size(), right_norm.size(), left_right_norm.size(), delta.size())
-        #     h = R*torch.arccosh(1+2*delta) + torch.cdist(left_emb[:,:,3:], right_emb[:,:,3:]).view(-1)
-        # else:
-        #     h = torch.cdist(left_emb, right_emb).view(-1)
-        loss = self.loss_fn(dist_hat, dist) # + self.max_loss_fn(h, dist)
-        # if self.measure == "hyperbolic":
-        #     loss = loss + torch.linalg.norm(1 - right_emb[:,0]**2 + torch.sum(right_emb[:,1:]**2, axis=1))
-        # print("forward", torch.sum(torch.isnan(dist_hat)).item())
-        # print()
+        dist_hat = get_distance(left_emb, right_emb, self.measure, self.norm, self.device)
+        loss = self.loss_fn(dist_hat, dist)
 
         if return_pred:
             return loss, dist, dist_hat
@@ -426,3 +388,10 @@ def run_collab_filtering(dataset, num_nodes, init_embeddings=None, eval_set=None
 
     write_file(output_path, embedding)
     return embedding
+
+def test_collab_filtering(config, embedding, val_set):
+    left, right, dist = val_set[:, 0].long(), val_set[:, 1].long(), val_set[:, 2]
+    left_emb = torch.tensor(embedding[left])
+    right_emb = torch.tensor(embedding[right])
+    dist_hat = get_distance(left_emb, right_emb, config["collab_filtering"]["measure"], config["collab_filtering"]["norm"], 'cpu').numpy()
+    return evaluate_metrics(dist.reshape(-1), dist_hat.reshape(-1), print_out=False, config=config)

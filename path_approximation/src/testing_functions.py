@@ -433,8 +433,8 @@ def run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_rou
         R = 6731000
         x, y = gr.node_to_idx[x], gr.node_to_idx[y]
         a, b = embedding[x], embedding[y]
-        np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
-        D = R*np.linalg.norm(a-b, ord=norm)
+        dot = np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+        D = R*np.linalg.norm(dot, ord=norm)
         emb_distances.append(D)
         return D
     def latlong_embedding_heuristic(x,y):
@@ -445,6 +445,13 @@ def run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_rou
         D = 2*R*np.arcsin(np.sqrt(d))
         emb_distances.append(D)
         return D
+    def invdot_embedding_heuristic(x,y):
+        x, y = gr.node_to_idx[x], gr.node_to_idx[y]
+        a, b = embedding[x], embedding[y]
+        dot = np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+        D = -(dot-1)*7/2
+        emb_distances.append(D)
+        return D   
 
     heuristics = {}
     if run_dijkstra:
@@ -458,6 +465,8 @@ def run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_rou
         heuristics["embedding"] = hyperbolic_embedding_heuristic
     elif config["collab_filtering"]["measure"] == "spherical": # spherical
         heuristics["embedding"] = spherical_embedding_heuristic
+    elif config["collab_filtering"]["measure"] == "inv-dot": # spherical
+        heuristics["embedding"] = invdot_embedding_heuristic
     else:
         heuristics["embedding"] = latlong_embedding_heuristic
     if test_pairs:

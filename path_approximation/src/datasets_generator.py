@@ -169,9 +169,9 @@ def create_collab_filtering_dataset(config, nx_graph, sample_ratio, node_list, n
     for source in tqdm(sources):
         node_dists = nx.shortest_path_length(G=nx_graph, source=source, weight=weight)
         for node_n, dist_to_n in node_dists.items():
-            # if not config["rizi_train"] or (node_n in node_list and dist_to_n > 1 and dist_to_n <= 5):
-            if node_n != source and ((source, node_n) not in dataset_map or dist_to_n < dataset_map[(source, node_n)]):
-                dataset_map[(source, node_n)] = np.double(dist_to_n)
+            if node_n in node_list: # not config["rizi_train"] or node_n in node_list # (node_n in node_list and dist_to_n > 1 and dist_to_n <= 5):
+                if node_n != source and ((source, node_n) not in dataset_map or dist_to_n < dataset_map[(source, node_n)]):
+                    dataset_map[(source, node_n)] = np.double(dist_to_n)
             
     dataset = []
     for (source, node_n), dist_to_n in tqdm(dataset_map.items()):
