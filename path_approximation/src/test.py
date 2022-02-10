@@ -35,7 +35,7 @@ if __name__ == '__main__':
     ## Then, follow each of below steps
 
     ## Read the config file:
-    data_generator_config = data_helper.read_yaml("../configs/collab_filtering.yaml")
+    data_generator_config = data_helper.read_yaml("../configs/routing.yaml")
 
     ## Make a log folder to log the experiments
     make_log_folder(log_folder_name=data_generator_config["log_path"])
@@ -47,7 +47,7 @@ if __name__ == '__main__':
     for i, config in enumerate(config_list):
         pprint(config)
         file_name = data_helper.get_file_name(config)
-        np.random.seed(config["random_seed"])
+        rng = np.random.default_rng(config["random_seed"])
 
         t_start = time.time()
         date_time = datetime.now()
@@ -81,10 +81,15 @@ if __name__ == '__main__':
         node_list = np.asarray(nx_graph.nodes)
         node2idx = {v:i for i,v in enumerate(node_list)}
 
+        if config["run_dist_routing"]:
+            testing_functions.run_routing_dist(config, nx_graph, test_pairs=True, plot_route=True, pairs_to_csv=True)
+            exit()
+
         ##### Run Collaborative Filtering using initial embedding to get final embeddings
         collab_filtering_args = config["collab_filtering"]
 
-        embedding_output_path = "../output/embedding/collab_filtering/{name}_embed-epochs{epochs}-lr{lr}-ratio{ratio}-d{dim}{measure}{norm}{embedding}.pkl".format(name=file_name,
+        embedding_output_path = "../output/embedding/collab_filtering/{name}/{loss}epochs{epochs}-lr{lr}-ratio{ratio}-d{dim}{measure}{norm}{embedding}.pkl".format(name=file_name,
+                                                                            loss=collab_filtering_args["loss_func"]+"_" if collab_filtering_args["loss_func"] != "mre" else "", # and collab_filtering_args["loss_func"] != "mse" else "",
                                                                             epochs=collab_filtering_args["epochs"],
                                                                             lr=collab_filtering_args["lr"],
                                                                             ratio=collab_filtering_args["sample_ratio"],
@@ -92,10 +97,11 @@ if __name__ == '__main__':
                                                                             measure="-"+collab_filtering_args["measure"] if collab_filtering_args["measure"] != "norm" else "",
                                                                             norm="-p"+str(collab_filtering_args["norm"]) if collab_filtering_args["measure"] == "norm" and collab_filtering_args["norm"] != 2 else "",
                                                                             embedding=("-"+collab_filtering_args["init_embedding"]+(str(config["grarep"]["order"]) if collab_filtering_args["init_embedding"] == "grarep" else "")) if collab_filtering_args["init_embedding"] != "coord" else "")
+        print("Full embedding output path:", embedding_output_path)
         #### Step 2. Create datasets
         print("Creating dataset")
-        dataset_output_path = "../output/datasets/collab_filtering_{}_ratio-{}".format(file_name, collab_filtering_args["sample_ratio"])
-        test_dataset_output_path = "../output/datasets/collab_filtering_test_{}_ratio-{}".format(file_name, collab_filtering_args["test_sample_ratio"])
+        dataset_output_path = "../output/datasets/collab_filtering/{}/ratio-{}".format(file_name, collab_filtering_args["sample_ratio"])
+        test_dataset_output_path = "../output/datasets/collab_filtering/{}/test_ratio-{}".format(file_name, collab_filtering_args["test_sample_ratio"])
 
         if os.path.isfile(dataset_output_path) and os.path.isfile(test_dataset_output_path):
             collab_filtering_dataset = data_helper.read_file(dataset_output_path)
@@ -106,12 +112,12 @@ if __name__ == '__main__':
             print(f"Dataset already exists! Read back from {dataset_output_path}")
         else:
             assert collab_filtering_args["sample_ratio"] + collab_filtering_args["test_sample_ratio"] <= 1
-            collab_filtering_dataset, sources = create_collab_filtering_dataset(config, nx_graph, collab_filtering_args["sample_ratio"], node_list, node2idx)
+            collab_filtering_dataset, sources = create_collab_filtering_dataset(config, nx_graph, collab_filtering_args["sample_ratio"], rng, node_list, node2idx)
             rem_node_list = np.setdiff1d(node_list, sources)
             if collab_filtering_args["sample_ratio"] == 1:
                 test_dataset = torch.clone(collab_filtering_dataset)
             else:
-                test_dataset, _ = create_collab_filtering_dataset(config, nx_graph, collab_filtering_args["test_sample_ratio"]/(1-collab_filtering_args["sample_ratio"]), rem_node_list, node2idx)
+                test_dataset, _ = create_collab_filtering_dataset(config, nx_graph, collab_filtering_args["test_sample_ratio"]/(1-collab_filtering_args["sample_ratio"]), rng, rem_node_list, node2idx)
             data_helper.write_file(dataset_output_path, collab_filtering_dataset)
             data_helper.write_file(test_dataset_output_path, test_dataset)
         print("Finished dataset. Size:", len(collab_filtering_dataset), ",", len(test_dataset))
@@ -122,58 +128,56 @@ if __name__ == '__main__':
             print(f"Embedding already exists! Read back from {embedding_output_path}")
         else:
             #### Step 3. Get initial vectors from graph
-            full_init_embedding = np.random.normal(scale=1/collab_filtering_args["embedding_dim"], size=(len(nx_graph.nodes), collab_filtering_args["embedding_dim"]))
-            h = 1.1
             assert config["collab_filtering"]["init_embedding"] in ["none", "coord", "node2vec", "grarep"]
-            if config["collab_filtering"]["init_embedding"] != "none":
-                if config["collab_filtering"]["init_embedding"] == "coord":
-                    assert config["graph"]["source"] == "osmnx" or config["graph"]["source"] == "gis-f2e"
-                    init_embedding = data_helper.get_coord_embedding(config, nx_graph, node_list)
-                    assert collab_filtering_args["embedding_dim"] >= init_embedding.shape[1]
-                elif config["collab_filtering"]["init_embedding"] == "node2vec":
-                    ##### Run Node2Vec to get the embedding if not spatial (or no coordinates)
-                    node2vec_args = config["node2vec"]
-                    assert collab_filtering_args["embedding_dim"] >= node2vec_args["embedding_dim"]
-                    node2vec_output_path = "../output/embedding/node2vec/{name}_embed-epochs{epochs}-lr{lr}-d{dim}.pkl".format(name=file_name,
-                                                                                epochs=node2vec_args["epochs"],
-                                                                                lr=node2vec_args["lr"],
-                                                                                dim=node2vec_args["embedding_dim"])
-                    if os.path.isfile(node2vec_output_path):
-                        init_embedding = data_helper.read_file(node2vec_output_path)
-                        print(f"Embedding already exists! Read back from {node2vec_output_path}")
-                    else:
-                        init_embedding = node2vec.run_node2vec(dgl_graph, eval_set=None, args=node2vec_args, output_path=node2vec_output_path)
-                    print(f"Done embedding {file_name}!")
 
-                    # Removing padding idx that is no longer necessary
-                    init_embedding = init_embedding[1:]
-                elif config["collab_filtering"]["init_embedding"] == "grarep":
-                    grarep_args = config["grarep"]
-                    assert collab_filtering_args["embedding_dim"] >= grarep_args["embedding_dim"]
-                    grarep_output_path = "../output/embedding/grarep/{name}_embed-order{order}-iters{iters}-d{dim}.pkl".format(name=file_name,
-                                                                                order=grarep_args["order"],
-                                                                                iters=grarep_args["iterations"],
-                                                                                dim=grarep_args["embedding_dim"])
-                    if os.path.isfile(grarep_output_path):
-                        init_embedding = data_helper.read_file(grarep_output_path)
-                        print(f"Embedding already exists! Read back from {grarep_output_path}")
-                    else:
-                        weight = "length" if config["graph"]["source"] == "osmnx" else "weight"
-                        grarep = GraRep(grarep_args["embedding_dim"], grarep_args["iterations"], grarep_args["order"], weight=weight)
-                        G = nx.relabel_nodes(nx_graph, node2idx)
-                        grarep.fit(G)
-                        init_embedding = grarep.get_embedding()
-                        data_helper.write_file(grarep_output_path, init_embedding)
-                    print(f"Done embedding {file_name}!")
+            full_init_embedding = rng.normal(scale=1/collab_filtering_args["embedding_dim"], size=(len(nx_graph.nodes), collab_filtering_args["embedding_dim"]))
+            init_embedding = None
+            if config["collab_filtering"]["init_embedding"] == "coord":
+                assert config["graph"]["source"] == "osmnx" or config["graph"]["source"] == "gis-f2e"
+                init_embedding = data_helper.get_coord_embedding(config, nx_graph, node_list)
+                assert collab_filtering_args["embedding_dim"] >= init_embedding.shape[1]
+            elif config["collab_filtering"]["init_embedding"] == "node2vec":
+                ##### Run Node2Vec to get the embedding if not spatial (or no coordinates)
+                node2vec_args = config["node2vec"]
+                assert collab_filtering_args["embedding_dim"] >= node2vec_args["embedding_dim"]
+                node2vec_output_path = "../output/embedding/node2vec/{name}/epochs{epochs}-lr{lr}-d{dim}.pkl".format(name=file_name,
+                                                                            epochs=node2vec_args["epochs"],
+                                                                            lr=node2vec_args["lr"],
+                                                                            dim=node2vec_args["embedding_dim"])
+                if os.path.isfile(node2vec_output_path):
+                    init_embedding = data_helper.read_file(node2vec_output_path)
+                    print(f"Embedding already exists! Read back from {node2vec_output_path}")
+                else:
+                    init_embedding = node2vec.run_node2vec(dgl_graph, eval_set=None, args=node2vec_args, output_path=node2vec_output_path, device=config["collab_filtering"]["device"])
+                print(f"Done embedding {file_name}!")
 
-                #### Step 3a. Transform and use inital embedding, padding to desired dimension with random normals
-                if collab_filtering_args["measure"] == "hyperbolic":
-                    init_embedding = np.divide(init_embedding, np.linalg.norm(init_embedding, axis=1)[:, None]) * h # * (np.sqrt(2)-1)
-                elif collab_filtering_args["measure"] == "spherical":
-                    init_embedding = np.divide(init_embedding, np.linalg.norm(init_embedding, axis=1)[:, None])
-                full_init_embedding[:, 0:init_embedding.shape[1]] = init_embedding    
-            elif collab_filtering_args["measure"] == "hyperbolic":
-                full_init_embedding = np.divide(full_init_embedding, np.linalg.norm(full_init_embedding, axis=1)[:, None]) * h
+                # Removing padding idx that is no longer necessary
+                init_embedding = init_embedding[1:]
+            elif config["collab_filtering"]["init_embedding"] == "grarep":
+                grarep_args = config["grarep"]
+                assert collab_filtering_args["embedding_dim"] >= grarep_args["embedding_dim"]
+                grarep_output_path = "../output/embedding/grarep/{name}/order{order}-iters{iters}-d{dim}.pkl".format(name=file_name,
+                                                                            order=grarep_args["order"],
+                                                                            iters=grarep_args["iterations"],
+                                                                            dim=grarep_args["embedding_dim"])
+                if os.path.isfile(grarep_output_path):
+                    init_embedding = data_helper.read_file(grarep_output_path)
+                    print(f"Embedding already exists! Read back from {grarep_output_path}")
+                else:
+                    weight = "length" if config["graph"]["source"] == "osmnx" else "weight"
+                    grarep = GraRep(grarep_args["embedding_dim"], grarep_args["iterations"], grarep_args["order"], weight=weight)
+                    G = nx.relabel_nodes(nx_graph, node2idx)
+                    grarep.fit(G)
+                    init_embedding = grarep.get_embedding()
+                    data_helper.write_file(grarep_output_path, init_embedding)
+                print(f"Done embedding {file_name}!")
+
+            if init_embedding is not None:
+                full_init_embedding[:, 0:init_embedding.shape[1]] = init_embedding
+            if collab_filtering_args["measure"] == "poincare":
+                full_init_embedding = np.divide(full_init_embedding, np.linalg.norm(full_init_embedding, axis=1)[:, None]) * (np.sqrt(2)-1)  
+            if collab_filtering_args["measure"] == "hyperboloid":
+                full_init_embedding = np.divide(full_init_embedding, np.linalg.norm(full_init_embedding, axis=1)[:, None]) * 1.1  
 
             full_init_embedding = torch.from_numpy(full_init_embedding)
 
@@ -181,13 +185,20 @@ if __name__ == '__main__':
             embedding = collaborative_filtering.run_collab_filtering(collab_filtering_dataset, len(nx_graph.nodes), init_embeddings=full_init_embedding, eval_set=test_dataset, args=collab_filtering_args, output_path=embedding_output_path, config=config)
         print(f"Done embedding {file_name}!")
 
-        test_metrics = collaborative_filtering.test_collab_filtering(config, embedding, test_dataset)
-        print("Final Results: {}".format(test_metrics))
+        if config["test_results"]:
+            test_metrics = collaborative_filtering.test_collab_filtering(config, embedding, test_dataset)
+            print("Final Results: {}".format(test_metrics))
 
         #### Step 5. Run routing
         # Generate all route pairs for Belmont CA to output complete performance percentiles
         if config["run_routing"]:
             testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_route=False, run_dijkstra=False, run_dist=False, pairs_to_csv=True)
+        if config["plot_routes"]:
+            testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=False, plot_route=True, run_dijkstra=False, run_dist=True)
+        if config["run_time_test"]:
+            testing_functions.run_time_test(config, nx_graph, embedding)
+        if config["run_dist_time_test"]:
+            testing_functions.run_time_test(config, nx_graph, embedding, use_dist=True)
 
         # Test alphas, reporting stretch
         # testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_route=False, run_dijkstra=False, run_dist=False, pairs_to_csv=True, alpha=1.75, report_stretch=True)
@@ -195,3 +206,5 @@ if __name__ == '__main__':
         # Plot routing for specific source and target, and compare to distance
         # source, target = 178318511, 1075324802
         # testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=False, plot_route=True, run_dijkstra=False, run_dist=True, source=source, target=target)
+        
+

@@ -275,7 +275,6 @@ def get_file_name(config):
     return file_name
 
 def get_coord_embedding(config, nx_graph, node_list):
-    R = 1 #6731
     p = np.pi/180
     dim = 2 if config["graph"]["source"] == "gis-f2e" or config["collab_filtering"]["measure"] == "lat-long" else 3   
     embedding = np.zeros((len(node_list), dim))
@@ -287,7 +286,7 @@ def get_coord_embedding(config, nx_graph, node_list):
             if config["collab_filtering"]["measure"] == "lat-long":
                 embedding[i] = np.asarray([lat, long])
             else:
-                embedding[i] = R*np.hstack((np.cos(lat)*np.cos(long), np.cos(lat)*np.sin(long), np.sin(lat)))
+                embedding[i] = np.hstack((np.cos(lat)*np.cos(long), np.cos(lat)*np.sin(long), np.sin(lat)))
     return embedding
 
 def get_dist_matrix(nx_graph, node_list, node2idx):

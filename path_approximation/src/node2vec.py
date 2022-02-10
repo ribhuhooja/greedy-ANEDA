@@ -227,7 +227,7 @@ class Node2vecModel(object):
         if device == 'cpu':
             self.device = device
         else:
-            self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            self.device = torch.device(device)
 
         print(f"...using {self.device}")
 
@@ -295,7 +295,7 @@ class Node2vecModel(object):
         return self.model(nodes)
 
 
-def run_node2vec(graph, eval_set=None, args=None, output_path=None):
+def run_node2vec(graph, eval_set=None, args=None, output_path=None, device="cpu"):
     t_tick = time.time()  ## start measuring running time
     if args is None:
         raise ValueError("need args for node2vec!")
@@ -316,7 +316,7 @@ def run_node2vec(graph, eval_set=None, args=None, output_path=None):
                             num_walks=args.num_walks,
                             eval_set=eval_set,
                             eval_steps=1,
-                            device=args.device)
+                            device=device)
 
     trainer.train(epochs=args.epochs, batch_size=args.batch_size, learning_rate=args.lr)
 
@@ -326,7 +326,7 @@ def run_node2vec(graph, eval_set=None, args=None, output_path=None):
     # Calc embedding
     embedding = trainer.embedding().data
 
-    if args.device == "cuda":
+    if "cuda" in device:
         embedding = embedding.cpu().numpy()
 
     write_file(output_path, embedding)

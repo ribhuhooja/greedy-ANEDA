@@ -161,15 +161,16 @@ def create_coord_dataset(config, nx_graph, node_list, node2idx):
 
 #     return torch.tensor(dataset)
 
-def create_collab_filtering_dataset(config, nx_graph, sample_ratio, node_list, node2idx):
-    sources = np.random.choice(node_list, int(len(node_list) * sample_ratio), replace=False)
+def create_collab_filtering_dataset(config, nx_graph, sample_ratio, rng, node_list, node2idx):
+    
+    sources = rng.choice(node_list, int(len(node_list) * sample_ratio), replace=False)
     node_list = set(node_list)
     dataset_map = {}
     weight = "length" if config["graph"]["source"] == "osmnx" or config["graph"]["source"] == "gis-f2e" else None
     for source in tqdm(sources):
         node_dists = nx.shortest_path_length(G=nx_graph, source=source, weight=weight)
         for node_n, dist_to_n in node_dists.items():
-            if node_n in node_list: # not config["rizi_train"] or node_n in node_list # (node_n in node_list and dist_to_n > 1 and dist_to_n <= 5):
+            if node_n in node_list:
                 if node_n != source and ((source, node_n) not in dataset_map or dist_to_n < dataset_map[(source, node_n)]):
                     dataset_map[(source, node_n)] = np.double(dist_to_n)
             

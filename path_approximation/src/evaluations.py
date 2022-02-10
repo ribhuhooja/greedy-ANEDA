@@ -13,19 +13,13 @@ def evaluate_metrics(y_true, y_pred, print_out, n_rounds=4, config=None):
     :param n_rounds: Use round(x, `n_rounds`) to return a floating point number that is a rounded
     :return:
     """
-    r = 1
-    if config["graph"]["name"] == "Winterthur, Switzerland":
-        r = 3.919
-    elif config["graph"]["name"] == "surat":
-        r = 6.99160409516
-    elif config["graph"]["name"] == "ego-facebook-original":
-        r = 1
+    if config["graph"]["name"] == "ego-facebook-original":
         y_pred = np.round(y_pred)
-    y_class = np.round(y_pred*1000)
-    y_true_class = np.round(y_true*1000)
+    y_class = np.round(y_pred)
+    y_true_class = np.round(y_true)
     linear_regression_acc = accuracy_score(y_true_class, y_class) * 100
     linear_regression_mse = mean_squared_error(y_true, y_pred)
-    linear_regression_mae = mean_absolute_error(y_true, y_pred) / r
+    linear_regression_mae = mean_absolute_error(y_true, y_pred)
     linear_regression_mre = mean_absolute_percentage_error(y_true, y_pred)
 
     if print_out:
