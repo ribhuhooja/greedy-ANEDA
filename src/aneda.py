@@ -1,4 +1,3 @@
-from os import spawnlp
 import time
 from collections import namedtuple
 

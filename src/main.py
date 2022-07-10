@@ -4,6 +4,7 @@ import logging
 import os.path
 from datetime import datetime
 import testing_functions
+from demo import demo
 from pprint import pformat, pprint
 import time
 import numpy as np
@@ -188,10 +189,12 @@ if __name__ == '__main__':
 
         #### Step 5. Run routing
         # Generate all route pairs for Belmont CA to output complete performance percentiles
+        if config['demo']:
+            demo(config, nx_graph, embedding)
         if config["run_routing"]:
             testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_route=False, run_dijkstra=False, run_dist=False, pairs_to_csv=True)
         if config["plot_routes"]:
-            testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=False, plot_route=True, run_dijkstra=False, run_dist=True)
+            testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=False, plot_route=True, run_dijkstra=False, run_dist=False)
         if config["run_time_test"]:
             testing_functions.run_time_test(config, nx_graph, embedding)
         if config["run_dist_time_test"]:
