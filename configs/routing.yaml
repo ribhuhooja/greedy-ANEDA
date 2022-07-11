@@ -29,7 +29,6 @@ run_time_test: False
 run_dist_time_test: False
 plot_routes: False
 test_results: False
-demo: True
 
 grarep:
   "embedding_dim": 128
