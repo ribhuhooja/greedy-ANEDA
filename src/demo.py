@@ -9,7 +9,9 @@ import data_helper
 
 
 if __name__ == '__main__':
-    graph = data_helper.download_networkx_graph('hartford', 'drive') 
+    # graph = data_helper.download_networkx_graph('hartford', 'drive') 
+
+    graph = data_helper.download_networkx_graph_bbox('boston', 'drive', 42.409334, 42.315990, -71.043685, -71.182222)
 
     _map = ox.folium.plot_graph_folium(graph, color='#a3dbff', weight=1.5)
 
@@ -80,5 +82,5 @@ if __name__ == '__main__':
 
     ClickForMarker().add_to(_map)
 
-    path = '../demo/public/index.html'
+    path = 'index2.html'
     _map.save(path)

@@ -1,19 +1,24 @@
 random_seed: 7
 graph:
   source: "osmnx" # "gis-f2e"
-  name: "hartford" # "Santa Ana, CA" # "surat"
-  diameter: 8.0 # 8.0 # 11.5
-  max_weight: 1597.949 # 1438.266
+  name: boston # "hartford" "Santa Ana, CA" # "surat"
+  bbox:
+    north: 42.409334
+    south: 42.315990
+    east: -71.043685
+    west: -71.182222
+  diameter: 110 # 8.0 # 11.5
+  max_weight: 4051.88 # 1597.949 # 1438.266
   file_path: "../data/{name}.{source}"
   download_type: "drive"
   coord_path: "../data/{name}.co"
   plot_path: "../plots/{name}"
 aneda:
-  "device": "cuda:2"
+  "device": "cuda"
   "embedding_dim": 128
-  "batch_size": 0
+  "batch_size": 4096
   "epochs": 1000 # 1000
-  "lr": 0.01 # 0.0003
+  "lr": 0.0001 # 0.01 # 0.0003
   "loss_func": "mre" # "mre", "mse", "poisson"
   "optimizer": "adam" # "adam", "sgd"
   "sample_ratio": 0.03
@@ -36,14 +41,14 @@ grarep:
   "order": 100
 node2vec:
   "embedding_dim": 128
-  "walk_length": 80
+  "walk_length": 100
   "window_size": 10
   "p": 1
-  "q": 1
+  "q": 1.5
   "num_walks": 10
   "epochs": 100
-  "batch_size": 256
-  "lr": 0.01
+  "batch_size": 64
+  "lr": 0.001
 
 
 plot:

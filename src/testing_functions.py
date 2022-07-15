@@ -7,9 +7,6 @@ from datetime import datetime
 import numpy as np
 from numpy.core.fromnumeric import repeat
 import torch.cuda
-from imblearn.over_sampling import RandomOverSampler
-from imblearn.under_sampling import RandomUnderSampler
-from sklearn.metrics import accuracy_score, mean_absolute_error, mean_squared_error, mean_absolute_percentage_error
 from torch import tensor, reshape
 import networkx as nx
 import osmnx as ox

@@ -24,29 +24,6 @@ from torch.utils.data import DataLoader
 from evaluations import evaluate_metrics
 
 
-if __name__ == '__main__':
-
-    # Steps 1-4
-    config, nx_graph, embedding = main("../configs/routing.yaml")
-    
-    #### Step 5. Run routing
-    # Generate all route pairs for Belmont CA to output complete performance percentiles
-    if config["run_routing"]:
-        testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_route=False, run_dijkstra=False, run_dist=False, pairs_to_csv=True)
-    if config["plot_routes"]:
-        testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=False, plot_route=True, run_dijkstra=False, run_dist=False)
-    if config["run_time_test"]:
-        testing_functions.run_time_test(config, nx_graph, embedding)
-    if config["run_dist_time_test"]:
-        testing_functions.run_time_test(config, nx_graph, embedding, use_dist=True)
-
-    # Test alphas, reporting stretch
-    # testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_route=False, run_dijkstra=False, run_dist=False, pairs_to_csv=True, alpha=1.75, report_stretch=True)
-
-    # Plot routing for specific source and target, and compare to distance
-    # source, target = 178318511, 1075324802
-    # testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=False, plot_route=True, run_dijkstra=False, run_dist=True, source=source, target=target)
-    
 
 def main(config_path):
      ##### Here is a sample flow to run the project
@@ -78,9 +55,14 @@ def main(config_path):
 
     ##### Step 1. Read data
     ## Load input file into a DGL graph, or download NetworkX graph and convert
+    # OSMnx graphs have length attribute for edges, and "x" and "y" for nodes denoting longitude and latitude
     if config["graph"]["source"] == "osmnx":
-        # OSMnx graphs have length attribute for edges, and "x" and "y" for nodes denoting longitude and latitude
-        nx_graph = data_helper.download_networkx_graph(config["graph"]["name"], config["graph"]["download_type"])            
+        if 'bbox' in config['graph']:
+            nx_graph = data_helper.download_networkx_graph_bbox(
+                config["graph"]["name"], config["graph"]["download_type"], 
+                config["graph"]["bbox"]["north"], config["graph"]["bbox"]["south"], config["graph"]["bbox"]["east"], config["graph"]["bbox"]["west"])
+        else:
+            nx_graph = data_helper.download_networkx_graph(config["graph"]["name"], config["graph"]["download_type"])            
         # The node attributes don't need to be kept for dgl since they won't be used in node2vec training,
         # however the edge weights are used in the modified version
         dgl_graph = dgl.from_networkx(nx_graph, edge_attrs=["length"])
@@ -204,3 +186,26 @@ def main(config_path):
     print(f"Done embedding {file_name}!")
 
     return config, nx_graph, embedding
+
+if __name__ == '__main__':
+
+    # Steps 1-4
+    config, nx_graph, embedding = main("../configs/routing.yaml")
+    
+    #### Step 5. Run routing
+    # Generate all route pairs for Belmont CA to output complete performance percentiles
+    if config["run_routing"]:
+        testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_route=False, run_dijkstra=False, run_dist=False, pairs_to_csv=True)
+    if config["plot_routes"]:
+        testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=False, plot_route=True, run_dijkstra=False, run_dist=False)
+    if config["run_time_test"]:
+        testing_functions.run_time_test(config, nx_graph, embedding)
+    if config["run_dist_time_test"]:
+        testing_functions.run_time_test(config, nx_graph, embedding, use_dist=True)
+
+    # Test alphas, reporting stretch
+    # testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_route=False, run_dijkstra=False, run_dist=False, pairs_to_csv=True, alpha=1.75, report_stretch=True)
+
+    # Plot routing for specific source and target, and compare to distance
+    # source, target = 178318511, 1075324802
+    # testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=False, plot_route=True, run_dijkstra=False, run_dist=True, source=source, target=target)

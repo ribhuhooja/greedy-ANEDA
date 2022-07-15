@@ -167,6 +167,34 @@ def download_networkx_graph(query, type, path=""):
     print("Num Edges: {}".format(G.number_of_edges()))
     return G
 
+def download_networkx_graph_bbox(query, type, north, south, east, west, path=""):
+    """
+    Downloads a networkx graph from osmnx using the given query
+    """
+    # If not provided, assume the save path is a combination of the query and type in the data folder
+    if path == "":
+        path = "../data/{}-{}-{}-{}-{}-{}.pkl".format(query, type, north, south, east, west)
+    if os.path.isfile(path): 
+        G = nx.read_gpickle(path)
+    else:
+        G = ox.graph_from_bbox(north, south, east, west, network_type=type)
+        max_weight = 0
+        weights = []
+        for u,v,d in G.edges(data=True):
+            weights.append(d['length'])
+            max_weight = max(max_weight, d['length'])
+        print("MAX WEIGHT:", max_weight)
+        print("AVG ORIGINAL WEIGHT:", sum(weights)/len(weights))
+        weights = []
+        for u,v,d in G.edges(data=True):
+            d['length'] = d['length']/max_weight
+            weights.append(d['length'])
+        print("AVG NEW WEIGHT:", sum(weights)/len(weights))
+        nx.write_gpickle(G, path)
+    print("Num Nodes: {}".format(G.number_of_nodes()))
+    print("Num Edges: {}".format(G.number_of_edges()))
+    return G
+
 def write_file(output_path, obj):
     ## Write to file
     if output_path is not None:
