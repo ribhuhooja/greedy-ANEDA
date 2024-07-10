@@ -1,1 +1,1 @@
-A* with embedding heuristic 0.593689
+A* with embedding heuristic 0.324376
