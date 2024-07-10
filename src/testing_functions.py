@@ -3,7 +3,6 @@ from os import path
 import os.path
 import sys
 from datetime import datetime
-
 import numpy as np
 from numpy.core.fromnumeric import repeat
 import torch.cuda
@@ -42,6 +41,31 @@ def run_astar(gr, pairs, alpha=2):
     print("Average Unnecessary Visits:", sum_visited / len(pairs))
     print("Max Unnecessary Visits:", max_visited, max_length, max_pair)
     return sum_visited / len(pairs), max_visited
+
+def run_greedy_csv(config, naem, gr, pairs, alpha=2):
+    file_name = data_helper.get_file_name(config)
+    stretches = []
+    failed=0
+    for i in tqdm(range(len(pairs))):
+        u, v, true_dist = pairs[i]
+        path = gr.greedy(u, v, alpha=alpha)
+        if path != None:
+            path_dist = 0
+            for i in range(1, len(path)):
+                path_dist += gr.graph.edges[path[i-1], path[i], 0]['length']
+            stretches.append([u, v, path_dist, true_dist])
+        else:
+            failed += 1
+    
+   columns = ["source", "target", "stretch"]
+   if name == "embedding":
+       stretch_path = "../output/routes/{}/embedding-stretches-ratio{}-dim{}{}.csv".format(file_name, config["aneda"]["sample_ratio"], config["aneda"]["embedding_dim"], "-"+config["aneda"]["measure"] if config["aneda"]["measure"] != "norm" else "")
+   else:
+       stretch_path = "../output/routes/{}/{}-stretches.csv".format(file_name, name)
+   df = pd.DataFrame(stretches, columns=["source", "target", "pathDistance", "trueDistance"])
+   df["stretch"] = df["pathDistance"] / df["trueDistance"]
+   df.to_csv(stretch_path)      
+   print("Average stretch is", df["stretch"].mean())
 
 def run_astar_csv(config, name, gr, pairs, alpha=2, report_stretch=True):
     print("The value of report stretch received by astar-csv is", report_stretch)
@@ -135,6 +159,40 @@ def plot_route(gr, f_name, u, v, alpha=2):
     fig, ax = ox.plot.plot_graph(G, node_color=node_colors, bbox=bbox, bgcolor="white", edge_color="dodgerblue")
     fig, ax = ox.plot.plot_graph_route(G, route, route_color='black', ax=ax)
     fig.savefig(f_name)
+
+def test_routing_pairs_greedy(config, gr, heuristics, alpha):
+    file_name = data_helper.get_file_name(config)
+    print("Retrieving true distances for {}".format(file_name))
+    path = "../output/routes/{}/true-distances.csv".format(file_name)
+    if os.path.isfile(path):
+        print("Reading back distances")
+        pairs = pd.read_csv(path).drop(columns=["Unnamed: 0"]).to_numpy()
+    else:
+        dist_map = {}
+        for source in tqdm(gr.node_list):
+            dist_map[source] = nx.shortest_path_length(G=gr.graph, source=source, weight="length")
+        pairs = [[u, v, dist] for u in dist_map.keys() for v, dist in dist_map[u].items() if u < v]
+        np.random.shuffle(pairs)
+        pd.DataFrame(pairs, columns=["source", "target", "dist"]).to_csv(path)
+
+    print("Done retrieving distances")
+
+    print("Testing pairs")
+    for name, heuristic in heuristics.items():
+        print("Greedy with {} heuristic".format(name))
+        gr.heuristic = heuristic
+        gr.distances = {}
+        start = datetime.now()
+        print("Running greedy_csv")
+        run_greedy_csv(config, name, gr, pairs, alpha=alpha)
+        end = datetime.now()
+        original_stdout = sys.stdout
+        with open('routes.txt', 'w') as f:
+            sys.stdout = f
+            print("greedy with {} heuristic".format(name), (end-start).total_seconds())
+        sys.stdout = original_stdout
+        print()
+
 
 def test_routing_pairs(config, gr, heuristics, pairs_to_csv, alpha=2, report_stretch=False):
     print("test-routing-pairs -> report stretch is", report_stretch)
@@ -285,7 +343,7 @@ def run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_rou
     heuristics["embedding"] = embedding_heuristic
     if test_pairs:
         print("testing pairs")
-        test_routing_pairs(config, gr, heuristics, pairs_to_csv, alpha, report_stretch)
+        test_routing_pairs(config, gr, heuristics, pairs_to_csv, alpha, report_stretch) #this is where astar is run
     if plot_route:
         generate_routing_plots(config, gr, heuristics, source=source, target=target)
 
@@ -296,6 +354,42 @@ def run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_rou
     print("Average Embedding Heuristic:", sum(emb_distances) / len(emb_distances))
 
     # if config["graph"]["source"] == "gr" or config["graph"]["source"] == "osmnx":
+
+# run greedy routing
+def run_greedy(config, nx_graph, embedding):
+"""
+    Run routing algorithm on given graph with given heuristic and landmark method
+    :param config: provide all we need in terms of parameters
+    :return: ?
+    """
+    gr = GraphRouter(graph=nx_graph, is_symmetric=pairs_to_csv)
+    norm = config["aneda"]["norm"]
+    
+    R = 6731000 / config["graph"]["max_weight"]
+    p = np.pi/180
+    real_distances = []
+    def dist_heuristic(a, b):
+        lat_a, long_a, lat_b, long_b = gr.graph.nodes[a]['y'], gr.graph.nodes[a]['x'], gr.graph.nodes[b]['y'], gr.graph.nodes[b]['x']
+        d = 0.5 - np.cos((lat_b-lat_a)*p)/2 + np.cos(lat_a*p)*np.cos(lat_b*p) * (1-np.cos((long_b-long_a)*p))/2
+        D = 2*R*np.arcsin(np.sqrt(d))
+        real_distances.append(D)
+        return D
+
+    emb_distances = []
+    nodes = []
+    def embedding_heuristic(x,y):
+        x, y = gr.node_to_idx[x], gr.node_to_idx[y]
+        a, b = embedding[x], embedding[y]
+        D = get_distance_numpy(a, b, config["aneda"]["measure"], config["aneda"]["norm"], config["graph"]["diameter"])
+        emb_distances.append(D)
+        return D
+
+    heuristics = {}
+
+    heuristics["embedding"] = embedding_heuristic
+    print("testing pairs")
+    test_routing_pairs_greedy(config, gr, heuristics, alpha) #this is where astar is run
+
 
 
 def run_routing_dist(config, nx_graph, test_pairs=True, plot_route=True, pairs_to_csv=False, alpha=1.5, source=None, target=None, report_stretch=False):

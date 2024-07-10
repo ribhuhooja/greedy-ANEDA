@@ -203,6 +203,9 @@ if __name__ == '__main__':
     if config["run_dist_time_test"]:
         testing_functions.run_time_test(config, nx_graph, embedding, use_dist=True)
 
+    if config["run_greedy"]:
+        testing_functions.run_greedy(config, nx_graph, embedding)
+
     # Test alphas, reporting stretch
     # testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_route=False, run_dijkstra=False, run_dist=False, pairs_to_csv=True, alpha=1.75, report_stretch=True)
 
