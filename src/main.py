@@ -40,7 +40,7 @@ def main(config_path):
 
     config = generate_config_list(data_generator_config)[0]
 
-    pprint(config)
+    #pprint(config)
     file_name = data_helper.get_file_name(config)
     rng = np.random.default_rng(config["random_seed"])
 
@@ -82,8 +82,8 @@ def main(config_path):
     node2idx = {v:i for i,v in enumerate(node_list)}
 
     if config["run_dist_routing"]:
-        testing_functions.run_routing_dist(config, nx_graph, test_pairs=True, plot_route=True, pairs_to_csv=True)
-        exit()
+        testing_functions.run_routing_dist(config, nx_graph, test_pairs=True, plot_route=False, pairs_to_csv=True) #changed plot to false for now
+        #exit()
 
     ##### Run ANEDA using initial embedding to get final embeddings
     aneda_args = config["aneda"]
@@ -195,7 +195,7 @@ if __name__ == '__main__':
     #### Step 5. Run routing
     # Generate all route pairs for Belmont CA to output complete performance percentiles
     if config["run_routing"]:
-        testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_route=False, run_dijkstra=False, run_dist=False, pairs_to_csv=True)
+        testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_route=False, run_dijkstra=False, run_dist=False, pairs_to_csv=True, report_stretch=True)
     if config["plot_routes"]:
         testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=False, plot_route=True, run_dijkstra=False, run_dist=False)
     if config["run_time_test"]:

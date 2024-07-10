@@ -1,12 +1,7 @@
 random_seed: 7
 graph:
   source: "osmnx" # "gis-f2e"
-  name: boston # "hartford" "Santa Ana, CA" # "surat"
-  bbox:
-    north: 42.409334
-    south: 42.315990
-    east: -71.043685
-    west: -71.182222
+  name: surat # "hartford" "Santa Ana, CA" # "surat"
   diameter: 110 # 8.0 # 11.5
   max_weight: 4051.88 # 1597.949 # 1438.266
   file_path: "../data/{name}.{source}"
@@ -28,12 +23,12 @@ aneda:
   "measure": "norm" # "norm" "spherical" "hyperbolic" "lat-long" "inv-dot"
   "norm": 2
 
-run_routing: False
-run_dist_routing: False
-run_time_test: False
-run_dist_time_test: False
+run_routing: True
+run_dist_routing: True
+run_time_test: True
+run_dist_time_test: True
 plot_routes: False
-test_results: False
+test_results: True
 
 grarep:
   "embedding_dim": 128

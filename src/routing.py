@@ -227,3 +227,27 @@ class GraphRouter():
                     est = new_dist + self.get_dist(arc, dest)
                     heappush(unseen, (est, arc))
         return None    # no valid path found`"""
+
+    def greedy(self, source, dest):
+        path = [source]
+        seen = set()
+
+        while path[-1] != dest:
+            curr = path[-1]
+
+            neighbors, _ = self.graph[curr].items()
+            best_neighbor = neighbors[0]
+            best_neighbor_dist = self.get_dist(best_neighbor, dest)
+            for neighbor in neighbors:
+                dist = self.get_dist(neighbor, dest)
+                if dist < best_neighbor_dist:
+                    best_neighbor_dist = dist
+                    best_neighbor = neighbor
+
+            path.append(best_neighbor)
+            if best_neighbor in seen:
+                return None
+
+            seen.add(neighbor)
+
+        return path

@@ -2,7 +2,6 @@
 .DS_Store
 Desktop.ini
 
-
 ### JupyterNotebooks ###
 # gitignore template for Jupyter Notebooks
 # website: http://jupyter.org/
@@ -237,3 +236,5 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
+# vim
+*.swp

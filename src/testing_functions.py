@@ -43,7 +43,8 @@ def run_astar(gr, pairs, alpha=2):
     print("Max Unnecessary Visits:", max_visited, max_length, max_pair)
     return sum_visited / len(pairs), max_visited
 
-def run_astar_csv(config, name, gr, pairs, alpha=2, report_stretch=False):
+def run_astar_csv(config, name, gr, pairs, alpha=2, report_stretch=True):
+    print("The value of report stretch received by astar-csv is", report_stretch)
     file_name = data_helper.get_file_name(config)
     routes = []
     stretches = []
@@ -72,7 +73,7 @@ def run_astar_csv(config, name, gr, pairs, alpha=2, report_stretch=False):
 
     df = pd.DataFrame(routes, columns=columns)
     df['performance'] = 1-df['pathLength']/df['numVisited']
-    report_percentiles(df, 'performance')
+    #report_percentiles(df, 'performance')
     df.to_csv(csv_path)
     
     if report_stretch:
@@ -83,8 +84,9 @@ def run_astar_csv(config, name, gr, pairs, alpha=2, report_stretch=False):
             stretch_path = "../output/routes/{}/{}-stretches.csv".format(file_name, name)
         df = pd.DataFrame(stretches, columns=["source", "target", "pathDistance", "trueDistance"])
         df["stretch"] = df["pathDistance"] / df["trueDistance"]
-        report_percentiles(df, 'stretch')
+        #report_percentiles(df, 'stretch')
         df.to_csv(stretch_path)      
+        print("Average stretch is", df["stretch"].mean())
 
 def plot_route(gr, f_name, u, v, alpha=2):
     G = gr.graph
@@ -135,6 +137,7 @@ def plot_route(gr, f_name, u, v, alpha=2):
     fig.savefig(f_name)
 
 def test_routing_pairs(config, gr, heuristics, pairs_to_csv, alpha=2, report_stretch=False):
+    print("test-routing-pairs -> report stretch is", report_stretch)
     if pairs_to_csv:
         if report_stretch:
             file_name = data_helper.get_file_name(config)
@@ -165,6 +168,7 @@ def test_routing_pairs(config, gr, heuristics, pairs_to_csv, alpha=2, report_str
         gr.distances = {}
         start = datetime.now()
         if pairs_to_csv:
+            print("Running astar_csv")
             run_astar_csv(config, name, gr, pairs, alpha=alpha, report_stretch=report_stretch)
         else:
             run_astar(gr, pairs, alpha=alpha)
@@ -280,6 +284,7 @@ def run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_rou
 
     heuristics["embedding"] = embedding_heuristic
     if test_pairs:
+        print("testing pairs")
         test_routing_pairs(config, gr, heuristics, pairs_to_csv, alpha, report_stretch)
     if plot_route:
         generate_routing_plots(config, gr, heuristics, source=source, target=target)
