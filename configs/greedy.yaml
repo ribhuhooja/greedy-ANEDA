@@ -1,7 +1,7 @@
 random_seed: 7
 graph:
-  source: "osmnx" # "gis-f2e"
-  name: surat # "hartford" "Santa Ana, CA" # "surat"
+  source: "edgelist" # "gis-f2e" # "osmnx"
+  name: ego-facebook-original # "hartford" "Santa Ana, CA" # "surat"
   diameter: 110 # 8.0 # 11.5
   max_weight: 4051.88 # 1597.949 # 1438.266
   file_path: "../data/{name}.{source}"
