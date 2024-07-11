@@ -190,7 +190,7 @@ def main(config_path):
 if __name__ == '__main__':
 
     # Steps 1-4
-    config, nx_graph, embedding = main("../configs/routing.yaml")
+    config, nx_graph, embedding = main("../configs/greedy.yaml")
     
     #### Step 5. Run routing
     # Generate all route pairs for Belmont CA to output complete performance percentiles
@@ -204,7 +204,9 @@ if __name__ == '__main__':
         testing_functions.run_time_test(config, nx_graph, embedding, use_dist=True)
 
     if config["run_greedy"]:
-        testing_functions.run_greedy(config, nx_graph, embedding)
+        print()
+        print("running greedy from main")
+        testing_functions.run_greedy(config, nx_graph, embedding, alpha=1.5)
 
     # Test alphas, reporting stretch
     # testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_route=False, run_dijkstra=False, run_dist=False, pairs_to_csv=True, alpha=1.75, report_stretch=True)

@@ -42,11 +42,13 @@ def run_astar(gr, pairs, alpha=2):
     print("Max Unnecessary Visits:", max_visited, max_length, max_pair)
     return sum_visited / len(pairs), max_visited
 
-def run_greedy_csv(config, naem, gr, pairs, alpha=2):
+def run_greedy_csv(config, name, gr, pairs, alpha=2):
     file_name = data_helper.get_file_name(config)
     stretches = []
     failed=0
+    total=0
     for i in tqdm(range(len(pairs))):
+        total+=1
         u, v, true_dist = pairs[i]
         path = gr.greedy(u, v, alpha=alpha)
         if path != None:
@@ -56,16 +58,18 @@ def run_greedy_csv(config, naem, gr, pairs, alpha=2):
             stretches.append([u, v, path_dist, true_dist])
         else:
             failed += 1
+    success_rate = 1 - (failed/total)
     
-   columns = ["source", "target", "stretch"]
-   if name == "embedding":
-       stretch_path = "../output/routes/{}/embedding-stretches-ratio{}-dim{}{}.csv".format(file_name, config["aneda"]["sample_ratio"], config["aneda"]["embedding_dim"], "-"+config["aneda"]["measure"] if config["aneda"]["measure"] != "norm" else "")
-   else:
-       stretch_path = "../output/routes/{}/{}-stretches.csv".format(file_name, name)
-   df = pd.DataFrame(stretches, columns=["source", "target", "pathDistance", "trueDistance"])
-   df["stretch"] = df["pathDistance"] / df["trueDistance"]
-   df.to_csv(stretch_path)      
-   print("Average stretch is", df["stretch"].mean())
+    columns = ["source", "target", "stretch"]
+    if name == "embedding":
+       stretch_path = "../output/routes/{}/greedy-stretches-ratio{}-dim{}{}.csv".format(file_name, config["aneda"]["sample_ratio"], config["aneda"]["embedding_dim"], "-"+config["aneda"]["measure"] if config["aneda"]["measure"] != "norm" else "")
+    else:
+       stretch_path = "../output/routes/{}/{}-greedy-stretches.csv".format(file_name, name)
+    df = pd.DataFrame(stretches, columns=["source", "target", "pathDistance", "trueDistance"])
+    df["stretch"] = df["pathDistance"] / df["trueDistance"]
+    df.to_csv(stretch_path)      
+    print("Success rate is", success_rate)
+    print("Average stretch is", df["stretch"].mean())
 
 def run_astar_csv(config, name, gr, pairs, alpha=2, report_stretch=True):
     print("The value of report stretch received by astar-csv is", report_stretch)
@@ -356,13 +360,13 @@ def run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_rou
     # if config["graph"]["source"] == "gr" or config["graph"]["source"] == "osmnx":
 
 # run greedy routing
-def run_greedy(config, nx_graph, embedding):
-"""
+def run_greedy(config, nx_graph, embedding, alpha):
+    """
     Run routing algorithm on given graph with given heuristic and landmark method
     :param config: provide all we need in terms of parameters
     :return: ?
     """
-    gr = GraphRouter(graph=nx_graph, is_symmetric=pairs_to_csv)
+    gr = GraphRouter(graph=nx_graph, is_symmetric=True)
     norm = config["aneda"]["norm"]
     
     R = 6731000 / config["graph"]["max_weight"]

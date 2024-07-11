@@ -228,14 +228,14 @@ class GraphRouter():
                     heappush(unseen, (est, arc))
         return None    # no valid path found`"""
 
-    def greedy(self, source, dest):
+    def greedy(self, source, dest, alpha=1): # alpha is there just to make the code work, it'll be gotten rid of
         path = [source]
         seen = set()
 
         while path[-1] != dest:
             curr = path[-1]
 
-            neighbors, _ = self.graph[curr].items()
+            neighbors = [i[0] for i in self.graph[curr].items()]
             best_neighbor = neighbors[0]
             best_neighbor_dist = self.get_dist(best_neighbor, dest)
             for neighbor in neighbors:
@@ -248,6 +248,6 @@ class GraphRouter():
             if best_neighbor in seen:
                 return None
 
-            seen.add(neighbor)
+            seen.add(best_neighbor)
 
         return path

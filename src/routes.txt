@@ -1,1 +1,1 @@
-A* with embedding heuristic 0.324376
+greedy with embedding heuristic 0.135538

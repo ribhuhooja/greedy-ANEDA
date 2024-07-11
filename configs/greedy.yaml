@@ -20,7 +20,7 @@ aneda:
   "test_sample_ratio": 0.05
 
   "init_embedding": "node2vec" # "coord" "node2vec" "grarep" "none"
-  "measure": "norm" # "norm" "spherical" "hyperbolic" "lat-long" "inv-dot"
+  "measure": "poincare" # "norm" "spherical" "hyperboloid" "poincare" "lat-long" "inv-dot"
   "norm": 2
 
 run_routing: True
