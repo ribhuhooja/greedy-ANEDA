@@ -206,7 +206,8 @@ if __name__ == '__main__':
     if config["run_greedy"]:
         print()
         print("running greedy from main")
-        testing_functions.run_greedy(config, nx_graph, embedding, alpha=1.5)
+        ratio_pairs = 1 if not config["greedy_pairs_ratio"] else float(config["greedy_pairs_ratio"])
+        testing_functions.run_greedy(config, nx_graph, embedding, alpha=1.5, ratio_pairs=ratio_pairs)
 
     # Test alphas, reporting stretch
     # testing_functions.run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_route=False, run_dijkstra=False, run_dist=False, pairs_to_csv=True, alpha=1.75, report_stretch=True)

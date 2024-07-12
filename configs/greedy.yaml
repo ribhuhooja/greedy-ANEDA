@@ -30,6 +30,7 @@ run_dist_time_test: False
 plot_routes: False
 test_results: True
 run_greedy: True
+greedy_pairs_ratio: 0.01
 
 grarep:
   "embedding_dim": 128

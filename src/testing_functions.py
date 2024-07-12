@@ -42,6 +42,32 @@ def run_astar(gr, pairs, alpha=2):
     print("Max Unnecessary Visits:", max_visited, max_length, max_pair)
     return sum_visited / len(pairs), max_visited
 
+def run_greedy_stretch_nocsv(config, name, gr, pairs, alpha=2):
+    stretches = []
+    failed=0
+    total=0
+    true_dists = []
+    for i in tqdm(range(len(pairs))):
+        total+=1
+        u, v, true_dist = pairs[i]
+        path = gr.greedy(u, v, alpha=alpha)
+        if path != None:
+            path_dist = 0
+            for i in range(1, len(path)):
+                path_dist += gr.graph.edges[path[i-1], path[i], 0]['length']
+            
+            stretches.append(path_dist/true_dist)
+            true_dists.append(true_dist)
+        else:
+            failed += 1
+    success_rate = 1 - (failed/total)
+    
+    print("Success rate is", success_rate)
+    print("Average stretch is", sum(stretches)/len(stretches))
+    print("The average true distance is", sum(true_dists)/len(true_dists))
+
+
+
 def run_greedy_csv(config, name, gr, pairs, alpha=2):
     file_name = data_helper.get_file_name(config)
     stretches = []
@@ -178,12 +204,10 @@ def test_routing_pairs_greedy(config, gr, heuristics, alpha, ratio_pairs=1):
         pairs = [[u, v, dist] for u in dist_map.keys() for v, dist in dist_map[u].items() if u < v]
         np.random.shuffle(pairs)
        
-       # if there are too many pairs only take some of them
-       if ratio_pairs < 1:
-           pairs = pairs[:int(len(pairs)*ratio_pairs)]
-
-
+        
         pd.DataFrame(pairs, columns=["source", "target", "dist"]).to_csv(path)
+
+
 
     print("Done retrieving distances")
 
@@ -194,7 +218,21 @@ def test_routing_pairs_greedy(config, gr, heuristics, alpha, ratio_pairs=1):
         gr.distances = {}
         start = datetime.now()
         print("Running greedy_csv")
-        run_greedy_csv(config, name, gr, pairs, alpha=alpha)
+        print("Total number of pairs:", len(pairs))
+        # if there are too many pairs only take some of them
+        print("Ratio of pairs used:", ratio_pairs)
+        if ratio_pairs < 1:
+            pairs = pairs[:int(len(pairs)*ratio_pairs)]
+
+        print("Number of pairs:", len(pairs))
+
+        # sanitize pairs data
+        if type(pairs[0][2]) == str:
+            print("Sanitizing pair data")
+            parse_tensors_in_pairs(pairs)
+
+
+        run_greedy_stretch_nocsv(config, name, gr, pairs, alpha=alpha)
         end = datetime.now()
         original_stdout = sys.stdout
         with open('routes.txt', 'w') as f:
@@ -366,7 +404,7 @@ def run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_rou
     # if config["graph"]["source"] == "gr" or config["graph"]["source"] == "osmnx":
 
 # run greedy routing
-def run_greedy(config, nx_graph, embedding, alpha):
+def run_greedy(config, nx_graph, embedding, alpha, ratio_pairs=1):
     """
     Run routing algorithm on given graph with given heuristic and landmark method
     :param config: provide all we need in terms of parameters
@@ -398,7 +436,7 @@ def run_greedy(config, nx_graph, embedding, alpha):
 
     heuristics["embedding"] = embedding_heuristic
     print("testing pairs")
-    test_routing_pairs_greedy(config, gr, heuristics, alpha) #this is where astar is run
+    test_routing_pairs_greedy(config, gr, heuristics, alpha, ratio_pairs) #this is where astar is run
 
 
 
@@ -558,3 +596,14 @@ def run_time_test(config, nx_graph, embedding, use_dist=True):
     #     end = datetime.now()
     #     dists.append(dist)
     #     times.append((end-start).total_seconds())
+
+def parse_tensors_in_pairs(pairs):
+    for i in range(len(pairs)):
+        pairs[i] = (pairs[i][0], pairs[i][1], parse_float_from_tensor_string(pairs[i][2]))
+
+def parse_float_from_tensor_string(tensor_string):
+    # this is super hacky
+    # the tensor string looks like 'tensor(num)
+    # we only want num
+    # so string[7:-1] should get it
+    return float(tensor_string[7:-1])  #eww
