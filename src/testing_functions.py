@@ -164,7 +164,7 @@ def plot_route(gr, f_name, u, v, alpha=2):
     fig, ax = ox.plot.plot_graph_route(G, route, route_color='black', ax=ax)
     fig.savefig(f_name)
 
-def test_routing_pairs_greedy(config, gr, heuristics, alpha):
+def test_routing_pairs_greedy(config, gr, heuristics, alpha, ratio_pairs=1):
     file_name = data_helper.get_file_name(config)
     print("Retrieving true distances for {}".format(file_name))
     path = "../output/routes/{}/true-distances.csv".format(file_name)
@@ -177,6 +177,12 @@ def test_routing_pairs_greedy(config, gr, heuristics, alpha):
             dist_map[source] = nx.shortest_path_length(G=gr.graph, source=source, weight="length")
         pairs = [[u, v, dist] for u in dist_map.keys() for v, dist in dist_map[u].items() if u < v]
         np.random.shuffle(pairs)
+       
+       # if there are too many pairs only take some of them
+       if ratio_pairs < 1:
+           pairs = pairs[:int(len(pairs)*ratio_pairs)]
+
+
         pd.DataFrame(pairs, columns=["source", "target", "dist"]).to_csv(path)
 
     print("Done retrieving distances")

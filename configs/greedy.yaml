@@ -23,7 +23,7 @@ aneda:
   "measure": "poincare" # "norm" "spherical" "hyperboloid" "poincare" "lat-long" "inv-dot"
   "norm": 2
 
-run_routing: True
+run_routing: False
 run_dist_routing: False
 run_time_test: False
 run_dist_time_test: False
