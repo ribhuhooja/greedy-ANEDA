@@ -66,81 +66,30 @@ def run_greedy_stretch_nocsv(config, name, gr, pairs, alpha=2):
     print("Average stretch is", sum(stretches)/len(stretches))
     print("The average true distance is", sum(true_dists)/len(true_dists))
 
-
-
-def run_greedy_csv(config, name, gr, pairs, alpha=2):
-    file_name = data_helper.get_file_name(config)
+def run_greedy_earlyabort_stretch_nocsv(config, name, gr, pairs, alpha=2):
     stretches = []
     failed=0
     total=0
+    true_dists = []
     for i in tqdm(range(len(pairs))):
         total+=1
         u, v, true_dist = pairs[i]
-        path = gr.greedy(u, v, alpha=alpha)
+        path = gr.greedy_early_abort(u, v, alpha=alpha)
         if path != None:
             path_dist = 0
             for i in range(1, len(path)):
                 path_dist += gr.graph.edges[path[i-1], path[i], 0]['length']
-            stretches.append([u, v, path_dist, true_dist])
+            
+            stretches.append(path_dist/true_dist)
+            true_dists.append(true_dist)
         else:
             failed += 1
     success_rate = 1 - (failed/total)
     
-    columns = ["source", "target", "stretch"]
-    if name == "embedding":
-       stretch_path = "../output/routes/{}/greedy-stretches-ratio{}-dim{}{}.csv".format(file_name, config["aneda"]["sample_ratio"], config["aneda"]["embedding_dim"], "-"+config["aneda"]["measure"] if config["aneda"]["measure"] != "norm" else "")
-    else:
-       stretch_path = "../output/routes/{}/{}-greedy-stretches.csv".format(file_name, name)
-    df = pd.DataFrame(stretches, columns=["source", "target", "pathDistance", "trueDistance"])
-    df["stretch"] = df["pathDistance"] / df["trueDistance"]
-    df.to_csv(stretch_path)      
     print("Success rate is", success_rate)
-    print("Average stretch is", df["stretch"].mean())
+    print("Average stretch is", sum(stretches)/len(stretches))
+    print("The average true distance is", sum(true_dists)/len(true_dists))
 
-def run_astar_csv(config, name, gr, pairs, alpha=2, report_stretch=True):
-    print("The value of report stretch received by astar-csv is", report_stretch)
-    file_name = data_helper.get_file_name(config)
-    routes = []
-    stretches = []
-    for i in tqdm(range(len(pairs))):
-        if report_stretch:
-            u, v, true_dist = pairs[i]
-        else:
-            u, v = pairs[i]
-        result = gr.astar(u, v, alpha=alpha)
-        if result != None:
-            path, num_visited, visited = result
-            routes.append([u, v, num_visited, len(path), len(set(visited))])
-            if report_stretch:
-                path_dist = 0
-                for i in range(1, len(path)):
-                    path_dist += gr.graph.edges[path[i-1], path[i], 0]['length']
-                stretches.append([u, v, path_dist, true_dist])
-
-    columns = ["source", "target", "numVisited", "pathLength", "uniqueVisited"]
-    if name == "embedding":
-        csv_path = "../output/routes/{}/embedding-routes-ratio{}-dim{}{}.csv".format(file_name, config["aneda"]["sample_ratio"], config["aneda"]["embedding_dim"], "-"+config["aneda"]["measure"] if config["aneda"]["measure"] != "norm" else "")
-        stretch_path = "../output/routes/{}/embedding-stretches-ratio{}-dim{}{}.csv".format(file_name, config["aneda"]["sample_ratio"], config["aneda"]["embedding_dim"], "-"+config["aneda"]["measure"] if config["aneda"]["measure"] != "norm" else "")
-    else:
-        csv_path = "../output/routes/{}/{}-routes.csv".format(file_name, name)
-        stretch_path = "../output/routes/{}/{}-stretches.csv".format(file_name, name)
-
-    df = pd.DataFrame(routes, columns=columns)
-    df['performance'] = 1-df['pathLength']/df['numVisited']
-    #report_percentiles(df, 'performance')
-    df.to_csv(csv_path)
-    
-    if report_stretch:
-        columns = ["source", "target", "stretch"]
-        if name == "embedding":
-            stretch_path = "../output/routes/{}/embedding-stretches-ratio{}-dim{}{}.csv".format(file_name, config["aneda"]["sample_ratio"], config["aneda"]["embedding_dim"], "-"+config["aneda"]["measure"] if config["aneda"]["measure"] != "norm" else "")
-        else:
-            stretch_path = "../output/routes/{}/{}-stretches.csv".format(file_name, name)
-        df = pd.DataFrame(stretches, columns=["source", "target", "pathDistance", "trueDistance"])
-        df["stretch"] = df["pathDistance"] / df["trueDistance"]
-        #report_percentiles(df, 'stretch')
-        df.to_csv(stretch_path)      
-        print("Average stretch is", df["stretch"].mean())
 
 def plot_route(gr, f_name, u, v, alpha=2):
     G = gr.graph
@@ -232,7 +181,7 @@ def test_routing_pairs_greedy(config, gr, heuristics, alpha, ratio_pairs=1):
             parse_tensors_in_pairs(pairs)
 
 
-        run_greedy_stretch_nocsv(config, name, gr, pairs, alpha=alpha)
+        run_greedy_earlyabort_stretch_nocsv(config, name, gr, pairs, alpha=alpha)
         end = datetime.now()
         original_stdout = sys.stdout
         with open('routes.txt', 'w') as f:
@@ -243,7 +192,6 @@ def test_routing_pairs_greedy(config, gr, heuristics, alpha, ratio_pairs=1):
 
 
 def test_routing_pairs(config, gr, heuristics, pairs_to_csv, alpha=2, report_stretch=False):
-    print("test-routing-pairs -> report stretch is", report_stretch)
     if pairs_to_csv:
         if report_stretch:
             file_name = data_helper.get_file_name(config)
@@ -315,45 +263,6 @@ def generate_routing_plots(config, gr, heuristics, source=None, target=None, min
         plot_route(gr, plot_path+"-A*_"+name+".png", source, target, alpha=alpha)
         print()
         
-# def run_routing_model(config, nx_graph, embedding, model, test_pairs=True, plot_route=True, run_dijkstra=True, run_dist=True):
-#     gr = GraphRouter(graph=nx_graph)
-    
-#     real_distances = []
-#     def dist_heuristic(a, b):
-#         R = 6731000
-#         p = np.pi/180
-#         lat_a, long_a, lat_b, long_b = gr.graph.nodes[a]['y'], gr.graph.nodes[a]['x'], gr.graph.nodes[b]['y'], gr.graph.nodes[b]['x']
-        
-#         d = 0.5 - np.cos((lat_b-lat_a)*p)/2 + np.cos(lat_a*p)*np.cos(lat_b*p) * (1-np.cos((long_b-long_a)*p))/2
-#         D = 2*R*np.arcsin(np.sqrt(d))
-#         real_distances.append(D)
-#         return D
-
-#     model_distances = []
-#     def model_heuristic(x, y):
-#         x, y = gr.node_to_idx[x], gr.node_to_idx[y]
-#         input = np.array((embedding[x] + embedding[y]) / 2.0).reshape(1,-1)
-#         # Convert prediction from km to meters
-#         out = Trainer.predict(model, input)[0]*1000
-#         model_distances.append(out)
-#         return out
-
-#     heuristics = {}
-#     if run_dijkstra:
-#         heuristics["dijkstra"] = gr.heuristic
-#     if run_dist:
-#         heuristics["distance"] = dist_heuristic
-#     heuristics["model"] = model_heuristic
-
-#     if test_pairs:
-#         test_routing_pairs(config, gr, heuristics)
-#     if plot_route:
-#         generate_routing_plots(config, gr, heuristics)
-
-#     if run_dist:
-#         print("Average Distance Heuristic:", sum(real_distances) / len(real_distances))
-#     print("Average Model Heuristic:", sum(model_distances) / len(model_distances))
-  
 def run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_route=True, run_dijkstra=True, run_dist=True, pairs_to_csv=False, alpha=1.5, source=None, target=None, report_stretch=False):
     """
     Run routing algorithm on given graph with given heuristic and landmark method
@@ -395,13 +304,9 @@ def run_routing_embedding(config, nx_graph, embedding, test_pairs=True, plot_rou
     if plot_route:
         generate_routing_plots(config, gr, heuristics, source=source, target=target)
 
-    # print(nodes[:10], emb_distances[:10])
-    # print(nodes[-10:], emb_distances[-10:])
     if run_dist:
         print("Average Distance Heuristic:", sum(real_distances) / len(real_distances))
     print("Average Embedding Heuristic:", sum(emb_distances) / len(emb_distances))
-
-    # if config["graph"]["source"] == "gr" or config["graph"]["source"] == "osmnx":
 
 # run greedy routing
 def run_greedy(config, nx_graph, embedding, alpha, ratio_pairs=1):
@@ -438,15 +343,9 @@ def run_greedy(config, nx_graph, embedding, alpha, ratio_pairs=1):
     print("testing pairs")
     test_routing_pairs_greedy(config, gr, heuristics, alpha, ratio_pairs) #this is where astar is run
 
-
-
-def run_routing_dist(config, nx_graph, test_pairs=True, plot_route=True, pairs_to_csv=False, alpha=1.5, source=None, target=None, report_stretch=False):
-    """
-    Run routing algorithm on given graph with given heuristic and landmark method
-    :param config: provide all we need in terms of parameters
-    :return: ?
-    """
-    gr = GraphRouter(graph=nx_graph, is_symmetric=pairs_to_csv)
+# evaluate how "greedy" the embedding is
+def evaluate_embedding_greediness(config, nx_graph, embedding, ratio_pairs):
+    gr = GraphRouter(graph=nx_graph, is_symmetric=True)
     norm = config["aneda"]["norm"]
     
     R = 6731000 / config["graph"]["max_weight"]
@@ -459,143 +358,63 @@ def run_routing_dist(config, nx_graph, test_pairs=True, plot_route=True, pairs_t
         real_distances.append(D)
         return D
 
-    heuristics = {}
-    heuristics["distance"] = dist_heuristic
-
-    if test_pairs:
-        test_routing_pairs(config, gr, heuristics, pairs_to_csv, alpha, report_stretch)
-    if plot_route:
-        generate_routing_plots(config, gr, heuristics, source=source, target=target)
-
-    print("Average Distance Heuristic:", sum(real_distances) / len(real_distances))
-
-# def run_routing_test_alphas(config, nx_graph, embedding):
-#     node_to_idx = {v: i for i,v in enumerate(list(nx_graph.nodes()))}
-#     def embedding_heuristic(x,y):
-#         x, y = node_to_idx[x], node_to_idx[y]
-#         a, b = embedding[x], embedding[y]
-#         D = 1000*np.linalg.norm(a-b)
-#         return D
-
-#     def dist_heuristic(a, b):
-#         R = 6731000
-#         p = np.pi/180
-#         lat_a, long_a, lat_b, long_b = nx_graph.nodes[a]['y'], nx_graph.nodes[a]['x'], nx_graph.nodes[b]['y'], nx_graph.nodes[b]['x']
-        
-#         d = 0.5 - np.cos((lat_b-lat_a)*p)/2 + np.cos(lat_a*p)*np.cos(lat_b*p) * (1-np.cos((long_b-long_a)*p))/2
-#         D = 2*R*np.arcsin(np.sqrt(d))
-#         return D
-
-#     gr = GraphRouter(graph=nx_graph)
-#     node_list = list(nx_graph.nodes())
-#     pairs = np.random.choice(node_list, size=(config["routing_num_samples"], 2)) # [(np.random.choice(node_list), np.random.choice(node_list)) for i in range(config["routing_num_samples"])]
-
-#     run_astar(gr, pairs)
-
-#     alphas = [1, 1.25, 1.5, 2, 5, 10]
-#     model_avg_visits = []
-#     model_max_visits = []
-#     dist_avg_visits = []
-#     dist_max_visits = []
-
-#     for alpha in alphas:
-#         print(alpha)
-#         gr.heuristic = embedding_heuristic
-#         gr.distances = {}
-#         avg_visits, max_visits = run_astar(gr, pairs, alpha)
-#         model_avg_visits.append(avg_visits)
-#         model_max_visits.append(max_visits)
-
-#         gr.heuristic = dist_heuristic
-#         gr.distances = {}
-#         avg_visits, max_visits = run_astar(gr, pairs, alpha)
-#         dist_avg_visits.append(avg_visits)
-#         dist_max_visits.append(max_visits)
-
-#     print(model_avg_visits)
-#     print(dist_avg_visits)
-#     print([dist_avg_visits[i]/model_avg_visits[i] for i in range(len(model_avg_visits))])
-#     print()
-#     print(model_max_visits)
-#     print(dist_max_visits)
-#     print([dist_max_visits[i]/model_max_visits[i] for i in range(len(model_max_visits))])
-
-# def run_routing_dist_matrix(config, nx_graph, matrix, test_pairs=True, plot_route=True, run_dijkstra=True, run_dist=True, pairs_to_csv=False, source=None, target=None):
-#     gr = GraphRouter(graph=nx_graph)
-    
-#     real_distances = []
-#     def dist_heuristic(a, b):
-#         R = 6731000
-#         p = np.pi/180
-#         lat_a, long_a, lat_b, long_b = gr.graph.nodes[a]['y'], gr.graph.nodes[a]['x'], gr.graph.nodes[b]['y'], gr.graph.nodes[b]['x']
-        
-#         d = 0.5 - np.cos((lat_b-lat_a)*p)/2 + np.cos(lat_a*p)*np.cos(lat_b*p) * (1-np.cos((long_b-long_a)*p))/2
-#         D = 2*R*np.arcsin(np.sqrt(d))
-#         real_distances.append(D)
-#         return D
-
-#     true_distances = []
-#     def matrix_heuristic(x,y):
-#         x, y = gr.node_to_idx[x], gr.node_to_idx[y]
-#         dist = matrix[x][y]
-#         true_distances.append(dist)
-#         return dist
-
-#     heuristics = {}
-#     if run_dijkstra:
-#         heuristics["dijkstra"] = gr.heuristic
-#     if run_dist:
-#         heuristics["distance"] = dist_heuristic
-#     heuristics["true"] = matrix_heuristic
-
-#     if test_pairs:
-#         test_routing_pairs(config, gr, heuristics, pairs_to_csv, alpha=1000)
-#     if plot_route:
-#         generate_routing_plots(config, gr, heuristics, source=source, target=target, alpha=1000)
-
-#     if run_dist:
-#         print("Average Distance Heuristic:", sum(real_distances) / len(real_distances))
-#     print("Average True Distance:", sum(true_distances) / len(true_distances))
-#     print()
-
-def run_time_test(config, nx_graph, embedding, use_dist=True):
-    pairs = np.random.choice(nx_graph.nodes(), size=(config["routing_num_samples"], 2))
-    node_to_idx = {v: i for i,v in enumerate(list(nx_graph.nodes()))}
-
-    R = 6371
-    p = np.pi/180
-    def dist_heuristic(a, b):
-        lat_a, long_a, lat_b, long_b = nx_graph.nodes[a]['y'], nx_graph.nodes[a]['x'], nx_graph.nodes[b]['y'], nx_graph.nodes[b]['x']
-        d = 0.5 - np.cos((lat_b-lat_a)*p)/2 + np.cos(lat_a*p)*np.cos(lat_b*p) * (1-np.cos((long_b-long_a)*p))/2
-        D = 2*R*np.arcsin(np.sqrt(d))
-        return D
-
+    emb_distances = []
+    nodes = []
     def embedding_heuristic(x,y):
-        x, y = node_to_idx[x], node_to_idx[y]
+        x, y = gr.node_to_idx[x], gr.node_to_idx[y]
         a, b = embedding[x], embedding[y]
         D = get_distance_numpy(a, b, config["aneda"]["measure"], config["aneda"]["norm"], config["graph"]["diameter"])
+        emb_distances.append(D)
         return D
 
-    if use_dist:
-        embedding_heuristic = dist_heuristic
-    
-    times = []
-    for a,b in pairs:
-        start = datetime.now()
-        dist = embedding_heuristic(a, b)
-        end = datetime.now()
-        times.append((end-start).total_seconds())
-    
-    print("Average Time:", sum(times)/len(times))
+    heuristics = {}
 
-    # times = []
-    # dists = []
-    # for i in range(1000):
-    #     start = datetime.now()
-    #     dist = embedding_heuristic(a, b)
-    #     end = datetime.now()
-    #     dists.append(dist)
-    #     times.append((end-start).total_seconds())
+    heuristics["embedding"] = embedding_heuristic
+    test_embedding_greediness(config, gr, heuristics, ratio_pairs)
+
+def test_embedding_greediness(config, gr, heuristic, ratio_pairs):
+
+    print("Testing embedding greediness")
+    for name, heuristic in heuristics.items():
+        print("Testing embedding greediness with {} heuristic".format(name))
+        gr.heuristic = heuristic
+        gr.distances = {}
+        print()
+        print("Total number of pairs:", len(pairs))
+        # if there are too many pairs only take some of them
+        print("Ratio of pairs used:", ratio_pairs)
+        if ratio_pairs < 1:
+            pairs = pairs[:int(len(pairs)*ratio_pairs)]
+        print("Number of pairs:", len(pairs))
+        print()
+        # sanitize pairs data
+        if type(pairs[0][2]) == str:
+            parse_tensors_in_pairs(pairs)
+    
+        greedy_pairs = 0
+        total_pairs = 0
+        for i in tqdm(range(len(pairs))):
+            total_pairs += 1
+            u, v, true_dist = pairs[i]
+            path = gr.greedy_early_abort(u, v, alpha=alpha)
+            if path != None:
+                path_dist = 0
+                for i in range(1, len(path)):
+                    path_dist += gr.graph.edges[path[i-1], path[i], 0]['length']
+                
+                stretches.append(path_dist/true_dist)
+                true_dists.append(true_dist)
+            else:
+                failed += 1
+        success_rate = 1 - (failed/total)
+        
+        print("Success rate is", success_rate)
+        print("Average stretch is", sum(stretches)/len(stretches))
+        print("The average true distance is", sum(true_dists)/len(true_dists))
+
+        print()
+
+
 
 def parse_tensors_in_pairs(pairs):
     for i in range(len(pairs)):
@@ -603,7 +422,7 @@ def parse_tensors_in_pairs(pairs):
 
 def parse_float_from_tensor_string(tensor_string):
     # this is super hacky
-    # the tensor string looks like 'tensor(num)
+    # the tensor string looks like 'tensor(num)'
     # we only want num
     # so string[7:-1] should get it
     return float(tensor_string[7:-1])  #eww

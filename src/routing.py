@@ -251,3 +251,28 @@ class GraphRouter():
             seen.add(best_neighbor)
 
         return path
+
+    def greedy_early_abort(self, source, dest, alpha=1):
+        path = [source]
+
+        while path[-1] != dest:
+            curr = path[-1]
+
+            neighbors = [i[0] for i in self.graph[curr].items()]
+            neighbors.append(curr)
+            best_neighbor = neighbors[0]
+            best_neighbor_dist = self.get_dist(best_neighbor, dest)
+            for neighbor in neighbors:
+                dist = self.get_dist(neighbor, dest)
+                if dist < best_neighbor_dist:
+                    best_neighbor_dist = dist
+                    best_neighbor = neighbor
+
+            if best_neighbor == curr:
+                return None
+
+            path.append(best_neighbor)
+
+        return path
+
+
