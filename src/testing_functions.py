@@ -4,6 +4,7 @@ import os.path
 import sys
 from datetime import datetime
 import numpy as np
+import math
 from numpy.core.fromnumeric import repeat
 import torch.cuda
 from torch import tensor, reshape
@@ -380,16 +381,14 @@ def test_embedding_greediness(config, gr, heuristic, ratio_pairs):
         gr.heuristic = heuristic
         gr.distances = {}
         print()
-        print("Total number of pairs:", len(pairs))
+        num_pairs = math.comb(len(gr.node_list), 2)
+        print("Total number of pairs:", num_pairs)
         # if there are too many pairs only take some of them
         print("Ratio of pairs used:", ratio_pairs)
-        if ratio_pairs < 1:
-            pairs = pairs[:int(len(pairs)*ratio_pairs)]
-        print("Number of pairs:", len(pairs))
+        num_chosen_pairs = int(num_pairs*ratio_pairs)
+        pairs = (np.random.choice(gr.node_list), np.random.choice(gr.node_list))
+        print("Number of pairs:", num_chosen_pairs)
         print()
-        # sanitize pairs data
-        if type(pairs[0][2]) == str:
-            parse_tensors_in_pairs(pairs)
     
         greedy_pairs = 0
         total_pairs = 0
