@@ -345,7 +345,7 @@ def run_greedy(config, nx_graph, embedding, alpha, ratio_pairs=1):
     test_routing_pairs_greedy(config, gr, heuristics, alpha, ratio_pairs) #this is where astar is run
 
 # evaluate how "greedy" the embedding is
-def evaluate_embedding_greediness(config, nx_graph, embedding, ratio_pairs):
+def evaluate_embedding_greediness(config, nx_graph, embedding, ratio_pairs, ratio_nodes):
     gr = GraphRouter(graph=nx_graph, is_symmetric=True)
     norm = config["aneda"]["norm"]
     
@@ -371,9 +371,9 @@ def evaluate_embedding_greediness(config, nx_graph, embedding, ratio_pairs):
     heuristics = {}
 
     heuristics["embedding"] = embedding_heuristic
-    test_embedding_greediness(config, gr, heuristics, ratio_pairs)
+    test_embedding_greediness(config, gr, heuristics, ratio_pairs, ratio_nodes)
 
-def test_embedding_greediness(config, gr, heuristic, ratio_pairs):
+def test_embedding_greediness(config, gr, heuristics, ratio_pairs, ratio_nodes):
 
     print("Testing embedding greediness")
     for name, heuristic in heuristics.items():
@@ -381,12 +381,17 @@ def test_embedding_greediness(config, gr, heuristic, ratio_pairs):
         gr.heuristic = heuristic
         gr.distances = {}
         print()
-        num_pairs = math.comb(len(gr.node_list), 2)
+
+        # Test greediness by pairs
+        num_pairs = choose_two(len(gr.node_list))
         print("Total number of pairs:", num_pairs)
-        # if there are too many pairs only take some of them
         print("Ratio of pairs used:", ratio_pairs)
         num_chosen_pairs = int(num_pairs*ratio_pairs)
-        pairs = (np.random.choice(gr.node_list), np.random.choice(gr.node_list))
+
+        all_pairs = [(u, v) for u in gr.node_list for v in gr.node_list if u<v]
+        np.random.shuffle(all_pairs)
+        pairs = all_pairs[:num_chosen_pairs]
+
         print("Number of pairs:", num_chosen_pairs)
         print()
     
@@ -394,25 +399,46 @@ def test_embedding_greediness(config, gr, heuristic, ratio_pairs):
         total_pairs = 0
         for i in tqdm(range(len(pairs))):
             total_pairs += 1
-            u, v, true_dist = pairs[i]
-            path = gr.greedy_early_abort(u, v, alpha=alpha)
-            if path != None:
-                path_dist = 0
-                for i in range(1, len(path)):
-                    path_dist += gr.graph.edges[path[i-1], path[i], 0]['length']
-                
-                stretches.append(path_dist/true_dist)
-                true_dists.append(true_dist)
-            else:
-                failed += 1
-        success_rate = 1 - (failed/total)
+            first, second = pairs[i]
+            if gr.pair_is_greedy(first, second):
+                greedy_pairs += 1
         
-        print("Success rate is", success_rate)
-        print("Average stretch is", sum(stretches)/len(stretches))
-        print("The average true distance is", sum(true_dists)/len(true_dists))
-
+        print("Percentage of greedy pairs is", 100*greedy_pairs/total_pairs, "%")
         print()
 
+
+        # Test greediness on single nodes
+        num_nodes = len(gr.node_list)
+        print("Total number of nodes:", num_nodes)
+        print("Ratio of pairs used:", ratio_nodes)
+        num_chosen_nodes = int(num_nodes * ratio_nodes)
+        num_chosen_pairs = int(num_pairs*ratio_pairs)
+        all_nodes = [u for u in gr.node_list]
+        np.random.shuffle(all_nodes)
+        nodes = all_nodes[:num_chosen_nodes]
+        print("number of nodes:", num_chosen_nodes)
+
+        total_nodes = 0
+        greedy_nodes = 0
+        for i in tqdm(range(len(nodes))):
+            total_nodes += 1
+            node = nodes[i]
+            is_greedy = True
+            for other in gr.node_list:
+                if other == node:
+                    continue
+
+                if not gr.node_is_greedy(node, other):
+                    is_greedy = False
+                    break
+            if is_greedy:
+                greedy_nodes += 1
+
+        print("Percentage of greedy (non local-minima) nodes is", 100*greedy_nodes/total_nodes, "%")
+        print()
+
+def choose_two(n):
+    return n*(n-1)//2
 
 
 def parse_tensors_in_pairs(pairs):

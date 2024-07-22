@@ -275,4 +275,23 @@ class GraphRouter():
 
         return path
 
+    def node_is_greedy(self, node, dest):
+        neighbors = [i[0] for i in self.graph[node].items()]
+        neighbors.append(node)
+        best_neighbor = neighbors[0]
+        best_neighbor_dist = self.get_dist(best_neighbor, dest)
+        for neighbor in neighbors:
+            dist = self.get_dist(neighbor, dest)
+            if dist < best_neighbor_dist:
+                best_neighbor_dist = dist
+                best_neighbor = neighbor
+
+        if best_neighbor == node:
+            return False
+
+        return True
+
+    def pair_is_greedy(self, first, second):
+        return self.node_is_greedy(first, second) and self.node_is_greedy(second, first)
+
 
