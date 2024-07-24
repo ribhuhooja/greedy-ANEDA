@@ -204,10 +204,18 @@ if __name__ == '__main__':
         testing_functions.run_time_test(config, nx_graph, embedding, use_dist=True)
 
     if config["run_greedy"]:
+        # choose the algorithm for routing
+        greedy_algorithm = config["greedy_algorithm"]
+        allowed_greedy_algos = set(["normal", "early_abort", "panic_jump"]) # This is probably the wrong place to do this but oh well
+        if greedy_algorithm not in allowed_greedy_algos: 
+            print("Unidentifiable greedy algorithm detected, reverting to normal greedy search")
+            greedy_algorithm = "normal"
+
+
         print()
         print("running greedy from main")
         ratio_pairs = 1 if not config["greedy_pairs_ratio"] else float(config["greedy_pairs_ratio"])
-        testing_functions.run_greedy(config, nx_graph, embedding, alpha=1.5, ratio_pairs=ratio_pairs)
+        testing_functions.run_greedy(config, nx_graph, embedding, alpha=1.5, ratio_pairs=ratio_pairs, greedy_algorithm=greedy_algorithm)
 
     if config["evaluate_embedding_greediness"]:
         print()

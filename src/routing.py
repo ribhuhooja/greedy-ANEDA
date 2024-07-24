@@ -228,7 +228,7 @@ class GraphRouter():
                     heappush(unseen, (est, arc))
         return None    # no valid path found`"""
 
-    def greedy(self, source, dest, alpha=1): # alpha is there just to make the code work, it'll be gotten rid of
+    def greedy(self, source, dest): 
         path = [source]
         seen = set()
 
@@ -252,7 +252,7 @@ class GraphRouter():
 
         return path
 
-    def greedy_early_abort(self, source, dest, alpha=1):
+    def greedy_early_abort(self, source, dest):
         path = [source]
 
         while path[-1] != dest:
@@ -274,6 +274,35 @@ class GraphRouter():
             path.append(best_neighbor)
 
         return path
+
+    def greedy_panic_jump(self, source, dest, num_panics=1):
+        """Like early abort, but instead of aborting it panics and goes to random neighbors"""
+        path = [source]
+
+        while path[-1] != dest:
+            curr = path[-1]
+
+            neighbors = [i[0] for i in self.graph[curr].items()]
+            neighbors.append(curr)
+            best_neighbor = neighbors[0]
+            best_neighbor_dist = self.get_dist(best_neighbor, dest)
+            for neighbor in neighbors:
+                dist = self.get_dist(neighbor, dest)
+                if dist < best_neighbor_dist:
+                    best_neighbor_dist = dist
+                    best_neighbor = neighbor
+
+            if best_neighbor == curr:
+                for i in range(num_panics):
+                    curr = np.random.choice([k[0] for k in self.graph[curr].items()])
+                    path.append(curr)
+                continue
+
+
+            path.append(best_neighbor)
+
+        return path
+
 
     def node_is_greedy(self, node, dest):
         neighbors = [i[0] for i in self.graph[node].items()]
