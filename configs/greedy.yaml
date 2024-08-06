@@ -30,7 +30,7 @@ run_dist_time_test: False
 plot_routes: False
 test_results: True
 run_greedy: True
-greedy_algorithm: "panic_jump" # "normal" "early_abort" "panic_jump"
+greedy_algorithm: "normal" # "normal" "early_abort" "panic_jump"
 greedy_pairs_ratio: 0.0001
 evaluate_embedding_greediness: False
 greedy_nodes_ratio: 1

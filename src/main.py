@@ -3,7 +3,6 @@ from distutils.file_util import write_file
 import logging
 import os.path
 from datetime import datetime
-import testing_functions
 from pprint import pformat, pprint
 import time
 import numpy as np
@@ -17,11 +16,12 @@ from utils import make_log_folder, generate_config_list
 import aneda
 import node2vec
 from grarep import GraRep
+import testing_functions
+from evaluations import evaluate_metrics
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from evaluations import evaluate_metrics
 
 
 

@@ -14,6 +14,7 @@ import osmnx as ox
 from aneda import get_distance_numpy, get_distance
 import data_helper
 from routing import GraphRouter
+
 import matplotlib.pyplot as plt
 import csv
 from tqdm import tqdm
@@ -31,6 +32,7 @@ def greedy_search(gr, pairs, algorithm):
     stretches = []
     failed=0
     total=0
+    num_shortest_found = 0
     true_dists = []
     for i in tqdm(range(len(pairs))):
         total+=1
@@ -43,12 +45,16 @@ def greedy_search(gr, pairs, algorithm):
             
             stretches.append(path_dist/true_dist)
             true_dists.append(true_dist)
+            if path_dist == true_dist:
+                num_shortest_found += 1
         else:
             failed += 1
     success_rate = 1 - (failed/total)
+
     
     print("Success rate is", success_rate)
     print("Average stretch is", sum(stretches)/len(stretches))
+    print("Percentage of shortest paths found is", num_shortest_found/len(stretches))
     print("The average true distance is", sum(true_dists)/len(true_dists))
 
 
